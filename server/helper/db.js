@@ -1,22 +1,21 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 
 mongoose.Promise = global.Promise;
 
-module.exports = () => {
-    mongoose.set('strictQuery', false); // Recommended for Mongoose 7+
+const connectDB = async () => {
+  try {
+    mongoose.set("strictQuery", false); // Recommended for Mongoose 7+
 
-    mongoose.connect('mongodb://127.0.0.1:27017/test', {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
+    await mongoose.connect("mongodb://127.0.0.1:27017/test", {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
     });
 
-    const db = mongoose.connection;
-
-    db.once('open', () => {
-        console.log('✅ MongoDB Connection Successful');
-    });
-
-    db.on('error', (err) => {
-        console.error('❌ MongoDB Connection Error:', err);
-    });
+    console.log("✅ MongoDB Connection Successful");
+  } catch (err) {
+    console.error("❌ MongoDB Connection Error:", err);
+    process.exit(1); // Exit process with failure
+  }
 };
+
+export default connectDB;

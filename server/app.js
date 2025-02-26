@@ -1,50 +1,61 @@
-var createError = require('http-errors');
-var express = require('express');
-var path = require('path');
-var cookieParser = require('cookie-parser');
-var logger = require('morgan');
-const cors = require('cors');
+import express from "express";
+import path from "path";
+import cookieParser from "cookie-parser";
+import logger from "morgan";
+import cors from "cors";
+import createError from "http-errors";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
-var indexRouter = require('./routes/index');
-var usersRouter = require('./routes/users');
-var tasksRouter = require('./routes/tasks');
-var storiesRouter = require('./routes/story');
-const db = require('./helper/db')();
-var app = express();
+import indexRouter from "./routes/index.js";
+import usersRouter from "./routes/users.js";
+import tasksRouter from "./routes/tasks.js";
+import storiesRouter from "./routes/story.js";
+import db from "./helper/db.js";
+
+// Initialize database
+db();
+
+const app = express();
+
+// Get __dirname equivalent in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 // Enable CORS for requests from http://localhost:3000
 app.use(cors({
-  origin: 'http://localhost:3000' // Ensure no trailing slash
+  origin: "http://localhost:3000" // Ensure no trailing slash
 }));
 
-// view engine setup
-app.set('views', path.join(__dirname, 'views'));
-app.set('view engine', 'pug');
-app.use(logger('dev'));
+// View engine setup
+app.set("views", path.join(__dirname, "views"));
+app.set("view engine", "pug");
+
+app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, "public")));
 
-app.use('/', indexRouter);
-app.use('/users', usersRouter);
-app.use('/tasks', tasksRouter);
-app.use('/story', storiesRouter);
+// Routes
+app.use("/", indexRouter);
+app.use("/users", usersRouter);
+app.use("/tasks", tasksRouter);
+app.use("/story", storiesRouter);
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
+// Catch 404 and forward to error handler
+app.use((req, res, next) => {
   next(createError(404));
 });
 
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
+// Error handler
+app.use((err, req, res, next) => {
   res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
+  res.locals.error = req.app.get("env") === "development" ? err : {};
 
-  // render the error page
+  // Render the error page
   res.status(err.status || 500);
   res.json({ error: { message: err.message, code: err.code } });
 });
 
-module.exports = app;
+export default app;
