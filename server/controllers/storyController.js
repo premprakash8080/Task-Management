@@ -15,7 +15,7 @@ const createStory = asyncHandler(async (req, res) => {
     const newStory = new Story({ title, content, status });
     await newStory.save();
 
-    res.status(201).json(new ApiResponse(201, "Story created successfully", newStory));
+    res.status(201).json(new ApiResponse(201, newStory ,"Story created successfully" ));
 });
 
 // Get All Stories
@@ -23,7 +23,7 @@ const getAllStories = asyncHandler(async (req, res) => {
     const stories = await Story.find({});
     if (!stories.length) throw new ApiError(404, "No stories found");
 
-    res.status(200).json(new ApiResponse(200, "Stories retrieved successfully", stories));
+    res.status(200).json(new ApiResponse(200, stories ,"Stories retrieved successfully" ));
 });
 
 // Get Story Count by Status
@@ -37,7 +37,7 @@ const getStoryCount = asyncHandler(async (req, res) => {
         },
     ]);
 
-    res.status(200).json(new ApiResponse(200, "Story count retrieved", count));
+    res.status(200).json(new ApiResponse(200, count, "Story count retrieved" ));
 });
 
 // Get a Single Story by ID
@@ -49,7 +49,7 @@ const getStoryById = asyncHandler(async (req, res) => {
     const story = await Story.findById(id);
     if (!story) throw new ApiError(404, "Story not found");
 
-    res.status(200).json(new ApiResponse(200, "Story retrieved successfully", story));
+    res.status(200).json(new ApiResponse(200, story, "Story retrieved successfully" ));
 });
 
 // Update Story
@@ -61,7 +61,7 @@ const updateStory = asyncHandler(async (req, res) => {
     const updatedStory = await Story.findByIdAndUpdate(id, req.body, { new: true });
     if (!updatedStory) throw new ApiError(404, "Story not found");
 
-    res.status(200).json(new ApiResponse(200, "Story updated successfully", updatedStory));
+    res.status(200).json(new ApiResponse(200,updatedStory,  "Story updated successfully" ));
 });
 
 // Delete Story

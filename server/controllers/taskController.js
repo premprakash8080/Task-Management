@@ -8,7 +8,7 @@ import mongoose from "mongoose";
 const createTask = asyncHandler(async (req, res) => {
     const task = new Task(req.body);
     await task.save();
-    res.status(201).json(new ApiResponse(201, "Task created successfully", task));
+    res.status(201).json(new ApiResponse(201, task, "Task created successfully", ));
 });
 
 // Get Task Counter by Status
@@ -21,7 +21,7 @@ const getTaskCounter = asyncHandler(async (req, res) => {
             }
         }
     ]);
-    res.status(200).json(new ApiResponse(200, "Task count retrieved", taskCount));
+    res.status(200).json(new ApiResponse(200, taskCount, "Task count retrieved", ));
 });
 
 // Get Tasks by Story ID
@@ -66,7 +66,7 @@ const getTasksByStoryId = asyncHandler(async (req, res) => {
             }
         }
     ]);
-    res.status(200).json(new ApiResponse(200, "Tasks retrieved successfully", tasks));
+    res.status(200).json(new ApiResponse(200, tasks ,"Tasks retrieved successfully" ));
 });
 
 // Get Single Task by ID
@@ -120,7 +120,7 @@ const getTaskById = asyncHandler(async (req, res) => {
 
     if (!task.length) throw new ApiError(404, "Task not found");
 
-    res.status(200).json(new ApiResponse(200, "Task retrieved successfully", task[0]));
+    res.status(200).json(new ApiResponse(200, task[0], "Task retrieved successfully" ));
 });
 
 // Update Task
@@ -128,7 +128,7 @@ const updateTask = asyncHandler(async (req, res) => {
     const updatedTask = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!updatedTask) throw new ApiError(404, "Task not found");
 
-    res.status(200).json(new ApiResponse(200, "Task updated successfully", updatedTask));
+    res.status(200).json(new ApiResponse(200, updatedTask ,"Task updated successfully" ));
 });
 
 // Delete Task
@@ -142,7 +142,7 @@ const deleteTask = asyncHandler(async (req, res) => {
 // Get All Tasks
 const getAllTasks = asyncHandler(async (req, res) => {
     const tasks = await Task.find({});
-    res.status(200).json(new ApiResponse(200, "All tasks retrieved successfully", tasks));
+    res.status(200).json(new ApiResponse(200, tasks, "All tasks retrieved successfully" ));
 });
 
 export {

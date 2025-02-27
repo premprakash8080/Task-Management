@@ -23,7 +23,7 @@ const registerUser = asyncHandler(async (req, res) => {
     const newUser = new User({ username, name, lastName, password: hashedPassword });
 
     await newUser.save();
-    res.status(201).json(new ApiResponse(201, "User registered successfully", newUser));
+    res.status(201).json(new ApiResponse(201,  newUser, "User registered successfully"));
 });
 
 // User Login
@@ -41,14 +41,14 @@ const loginUser = asyncHandler(async (req, res) => {
     if (!isMatch) throw new ApiError(400, "Invalid credentials");
 
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "1h" });
-    res.status(200).json(new ApiResponse(200, "Login successful", { token }));
+    res.status(200).json(new ApiResponse(200,  { token } ,"Login successful"));
 });
 
 // Create User
 const createUser = asyncHandler(async (req, res) => {
     const user = new User(req.body);
     await user.save();
-    res.status(201).json(new ApiResponse(201, "User created successfully", user));
+    res.status(201).json(new ApiResponse(201, user ,"User created successfully" ));
 });
 
 // Get All Users
@@ -56,7 +56,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
     const users = await User.find({});
     if (!users.length) throw new ApiError(404, "No users found");
 
-    res.status(200).json(new ApiResponse(200, "Users retrieved successfully", users));
+    res.status(200).json(new ApiResponse(200,  users ,"Users retrieved successfully"));
 });
 
 // Delete User
