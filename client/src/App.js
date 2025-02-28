@@ -1,11 +1,11 @@
 import React, { Component } from 'react';
-import Dashboard from './components/dashboard'
+import AppRoutes from './routes'; // Import AppRoutes
 
 class App extends Component {
   render() {
     return (
       <div className="App">
-       <Dashboard/>
+        <AppRoutes /> {/* Use AppRoutes for routing */}
       </div>
     );
   }

@@ -28,15 +28,19 @@ export default class Story extends Component {
         if (!storyId) return; // Ensure storyId is defined
         axios.get(`http://localhost:9000/tasks/${storyId}`)
             .then((response) => {
-                console.log("Fetched tasks:", response.data);
-                this.setState({
-                    tasks: response.data,
-                    loading: false
-                });
+                // Assuming response.data is now structured with statusCode, data, message, and success
+                if (response.data.success) {
+                    this.setState({
+                        tasks: response.data.data, // Set tasks to the data array from the response
+                    });
+                } else {
+                    console.error("Error fetching tasks:", response.data.message);
+                }
+                this.setState({ loading: false }); // Set loading to false after processing
             })
             .catch((error) => {
                 console.error("Error fetching tasks:", error);
-                this.setState({ loading: false });
+                this.setState({ loading: false }); // Set loading to false on error
             });
     };
 
@@ -48,6 +52,7 @@ export default class Story extends Component {
     };
 
     render() {
+        const { tasks, loading } = this.state;
         return (
             <div className="container">
                 {/* Pass fetchTasks to AddStory */}
@@ -61,28 +66,44 @@ export default class Story extends Component {
                             <b className="fas fa-lightbulb" /> Backlog
                             <Tooltips id="1" content="You can do what you want to do with this column" placement="top" storyType={this.props.storyType} />
                         </div>
-                        <Task tasks={this.state.tasks} loading={this.state.loading} filter="1" />
+                        {loading ? (
+                            <div>Loading...</div>
+                        ) : (
+                            <Task tasks={tasks} loading={loading} filter="1" />
+                        )}
                     </div>
                     <div className="col-sm mcell mcolor2">
                         <div className="mcell-title story">
                             <b className="fas fa-bars" /> TODO
                             <Tooltips id="2" content="You can do what you want to do with this column" placement="top" storyType={this.props.storyType} />
                         </div>
-                        <Task tasks={this.state.tasks} loading={this.state.loading} filter="2" />
+                        {loading ? (
+                            <div>Loading...</div>
+                        ) : (
+                            <Task tasks={tasks} loading={loading} filter="2" />
+                        )}
                     </div>
                     <div className="col-sm mcell mcolor3">
                         <div className="mcell-title story">
                             <b className="fas fa-spinner"></b> In Progress
                             <Tooltips id="3" content="You can do what you want to do with this column" placement="top" storyType={this.props.storyType} />
                         </div>
-                        <Task tasks={this.state.tasks} loading={this.state.loading} filter="3" />
+                        {loading ? (
+                            <div>Loading...</div>
+                        ) : (
+                            <Task tasks={tasks} loading={loading} filter="3" />
+                        )}
                     </div>
                     <div className="col-sm mcell mcolor4">
                         <div className="mcell-title story">
                             <b className="fas fa-check" /> Done
                             <Tooltips id="4" content="You can do what you want to do with this column" placement="top" storyType={this.props.storyType} />
                         </div>
-                        <Task tasks={this.state.tasks} loading={this.state.loading} filter="4" />
+                        {loading ? (
+                            <div>Loading...</div>
+                        ) : (
+                            <Task tasks={tasks} loading={loading} filter="4" />
+                        )}
                     </div>
                 </div>
             </div>

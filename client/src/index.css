@@ -1,0 +1,11 @@
+.active-button {
+    background-color: #F97316; /* Custom orange */
+    color: white;
+    border-radius: 6px;
+    padding: 8px 16px;
+  }
+
+
+  .bg-orange{
+    background-color: #F97316;
+  }

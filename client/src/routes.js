@@ -1,20 +1,30 @@
 import React from 'react'
-import {Route} from 'react-router'
-import App from './components/dashboard'
-import About from './components/about';
+import { Routes, Route } from 'react-router-dom'
+import DashboardWrapper from './components/dashboard'
+import About from './components/pages/About'
+import Contact from './components/pages/Contact'
+import Login from './components/Login'
+import HomePage from './components/pages/HomePage'
+
 const IndexPage = () => {
 
-    return <div>Welcome to Scrum Master<br/><a href="/story/1">Homepage</a></div>
+    return <div>Welcome to Scrum Master<br/><a href="/story/1">Homepage</a><br/><a href="/login">Login</a></div>
 }
 const NotFoundPage = () => {
 
     return <div><h2>Not Found</h2><br/><a href="/story/1">Homepage</a></div>
 }
-export default(
-    <Route>
-        <Route path='/story/:id' exact component={App}/>
-        <Route path='/about' exact component={About}/>
-        <Route exact path="/" component={IndexPage} />
-        <Route path='*' exact component={NotFoundPage}/>
-    </Route>
-)
+const AppRoutes = () => {
+    return (
+        <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/story/:id" element={<DashboardWrapper />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/" element={<IndexPage />} />
+            <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+    )
+}
+export default AppRoutes

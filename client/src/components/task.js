@@ -48,38 +48,41 @@ class Task extends Component{
   }
 
   render(){
-    const {tasks,loading,filter} = this.props;
+    const {tasks, loading, filter} = this.props;
     let content;
+
+    // Ensure tasks is an array before filtering
     if (loading) {
-      content = <div className="loader">
-       <Loader/>
-      </div>;
+        content = <div className="loader">
+            <Loader/>
+        </div>;
+    } else {
+        // Check if tasks is an array
+        const taskList = Array.isArray(tasks) ? tasks.filter(i => i.status === Number(filter)) : [];
+
+        content = taskList.map((i, index) => {
+            return (
+                <li id={i._id} className="mcell-task" key={index}>
+                    <span className="task-name">
+                        <span>{i.title}</span>
+                        <i id="delete" className="fas fa-times" onClick={() => this.api(i._id)}></i>
+                    </span>
+                    <span className="task-details">{i.content}</span>
+                    <div>
+                        <span className="task-due">{moment(i.dueDate).format("DD.MM.YYYY")}</span>
+                        <span className="task-contributors">
+                            <img alt={i.contributors[0].name + ' ' + i.contributors[0].lastName} title={i.contributors[0].name + ' ' + i.contributors[0].lastName} src={'/assets/img/' + i.contributors[0].profilePhoto}/>
+                        </span>
+                    </div>
+                    <div className={i.color}/>
+                    <ModalExampleDimmer propContent={i} classType="btnDashboard"/>
+                </li>
+            )
+        });
     }
-    else{
-      content = 
-      tasks.filter(i=>i.status===Number(filter))
-      .map((i,index)=>{
-        return(
-          <li id={i._id} className="mcell-task" key={index}>
-            <span className="task-name">
-              <span>{i.title}</span>
-              <i id="delete" className="fas fa-times" onClick={() => this.api(i._id)}></i>
-            </span>
-            <span className="task-details">{i.content}</span>
-            <div>
-            <span className="task-due">{moment(i.dueDate).format("DD.MM.YYYY")}</span>
-            <span className="task-contributors">
-              <img alt={i.contributors[0].name + ' '+i.contributors[0].lastName } title={i.contributors[0].name + ' '+i.contributors[0].lastName } src={'/assets/img/' + i.contributors[0].profilePhoto}/>
-            </span>
-          </div>
-          <div className={i.color}/>
-          <ModalExampleDimmer propContent={i} classType="btnDashboard"/>
-          </li>
-        )
-      })
-    }
-    return(
-      <div className="process">{content}</div>
+
+    return (
+        <div className="process">{content}</div>
     )
   }
 }
