@@ -10,7 +10,7 @@ import { dirname } from "path";
 import indexRouter from "./routes/index.js";
 import usersRouter from "./routes/users.js";
 import tasksRouter from "./routes/tasks.js";
-import storiesRouter from "./routes/story.js";
+import projectsRouter from "./routes/project.js";
 import db from "./helper/db.js";
 
 // Initialize database
@@ -24,7 +24,7 @@ const __dirname = dirname(__filename);
 
 // Enable CORS for requests from http://localhost:3000
 app.use(cors({
-  origin: "http://localhost:3000" // Ensure no trailing slash
+  origin: "http://localhost:3000"
 }));
 
 // View engine setup
@@ -37,11 +37,11 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
-// Routes
-app.use("/", indexRouter);
-app.use("/users", usersRouter);
-app.use("/tasks", tasksRouter);
-app.use("/story", storiesRouter);
+// API Routes
+app.use("/api", indexRouter);
+app.use("/api/users", usersRouter);
+app.use("/api/tasks", tasksRouter);
+app.use("/api/projects", projectsRouter);
 
 // Catch 404 and forward to error handler
 app.use((req, res, next) => {
@@ -50,12 +50,11 @@ app.use((req, res, next) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  res.locals.message = err.message;
-  res.locals.error = req.app.get("env") === "development" ? err : {};
-
-  // Render the error page
-  res.status(err.status || 500);
-  res.json({ error: { message: err.message, code: err.code } });
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message,
+    error: req.app.get("env") === "development" ? err : {}
+  });
 });
 
 export default app;

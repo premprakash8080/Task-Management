@@ -1,80 +1,165 @@
 import mongoose from "mongoose";
-import { User } from "../models/User.js";
+import User from "../models/User.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// Generate JWT Token
+const generateToken = (id) => {
+    return jwt.sign({ id }, process.env.JWT_SECRET || "your_jwt_secret", {
+        expiresIn: "30d"
+    });
+};
+
 // User Registration
 const registerUser = asyncHandler(async (req, res) => {
-    const { username, name, lastName, password } = req.body;
+    const { username, email, name, lastName, password } = req.body;
 
-    if (!username || !name || !lastName || !password) {
+    if (!username || !email || !name || !password) {
         throw new ApiError(400, "All fields are required");
     }
 
-    const existingUser = await User.findOne({ username });
+    // Check if user already exists
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
-        throw new ApiError(400, "Username already exists");
+        throw new ApiError(400, "User already exists with this email or username");
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const newUser = new User({ username, name, lastName, password: hashedPassword });
+    const user = await User.create({
+        username,
+        email,
+        name,
+        lastName,
+        password
+    });
 
-    await newUser.save();
-    res.status(201).json(new ApiResponse(201,  newUser, "User registered successfully"));
+    const token = generateToken(user._id);
+
+    res.status(201).json(
+        new ApiResponse(201, {
+            user: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                name: user.name,
+                lastName: user.lastName,
+                role: user.role
+            },
+            token
+        }, "User registered successfully")
+    );
 });
 
 // User Login
 const loginUser = asyncHandler(async (req, res) => {
-    const { username, password } = req.body;
+    const { email, password } = req.body;
 
-    if (!username || !password) {
-        throw new ApiError(400, "Username and password are required");
+    if (!email || !password) {
+        throw new ApiError(400, "Email and password are required");
     }
 
-    const user = await User.findOne({ username });
-    if (!user) throw new ApiError(400, "User not found");
+    const user = await User.findOne({ email }).select("+password");
+    if (!user) {
+        throw new ApiError(401, "Invalid credentials");
+    }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) throw new ApiError(400, "Invalid credentials");
+    const isPasswordMatch = await user.comparePassword(password);
+    if (!isPasswordMatch) {
+        throw new ApiError(401, "Invalid credentials");
+    }
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET || "your_jwt_secret", { expiresIn: "1h" });
-    res.status(200).json(new ApiResponse(200,  { token } ,"Login successful"));
+    const token = generateToken(user._id);
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            user: {
+                _id: user._id,
+                username: user.username,
+                email: user.email,
+                name: user.name,
+                lastName: user.lastName,
+                role: user.role
+            },
+            token
+        }, "Login successful")
+    );
 });
 
-// Create User
-const createUser = asyncHandler(async (req, res) => {
-    const user = new User(req.body);
+// Get Current User Profile
+const getCurrentUser = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id);
+    res.status(200).json(new ApiResponse(200, user, "User profile retrieved"));
+});
+
+// Update User Profile
+const updateProfile = asyncHandler(async (req, res) => {
+    const { name, lastName, email } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (user) {
+        user.name = name || user.name;
+        user.lastName = lastName || user.lastName;
+        user.email = email || user.email;
+
+        const updatedUser = await user.save();
+        res.status(200).json(new ApiResponse(200, updatedUser, "Profile updated successfully"));
+    } else {
+        throw new ApiError(404, "User not found");
+    }
+});
+
+// Change Password
+const changePassword = asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+        throw new ApiError(400, "Both current and new password are required");
+    }
+
+    const user = await User.findById(req.user._id).select("+password");
+    const isMatch = await user.comparePassword(currentPassword);
+
+    if (!isMatch) {
+        throw new ApiError(401, "Current password is incorrect");
+    }
+
+    user.password = newPassword;
     await user.save();
-    res.status(201).json(new ApiResponse(201, user ,"User created successfully" ));
+
+    res.status(200).json(new ApiResponse(200, null, "Password changed successfully"));
 });
 
-// Get All Users
+// Get All Users (Admin only)
 const getAllUsers = asyncHandler(async (req, res) => {
-    const users = await User.find({});
-    if (!users.length) throw new ApiError(404, "No users found");
-
-    res.status(200).json(new ApiResponse(200,  users ,"Users retrieved successfully"));
+    const users = await User.find({}).select("-password");
+    res.status(200).json(new ApiResponse(200, users, "Users retrieved successfully"));
 });
 
-// Delete User
+// Delete User (Admin only)
 const deleteUser = asyncHandler(async (req, res) => {
     const { id } = req.params;
 
-    if (!mongoose.isValidObjectId(id)) throw new ApiError(400, "Invalid user ID");
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new ApiError(400, "Invalid user ID");
+    }
 
     const deletedUser = await User.findByIdAndDelete(id);
-    if (!deletedUser) throw new ApiError(404, "User not found");
+    
+    if (!deletedUser) {
+        throw new ApiError(404, "User not found");
+    }
 
-    res.status(200).json(new ApiResponse(200, "User deleted successfully"));
+    res.status(200).json(new ApiResponse(200, null, "User deleted successfully"));
 });
 
 export {
     registerUser,
     loginUser,
-    createUser,
+    getCurrentUser,
+    updateProfile,
+    changePassword,
     getAllUsers,
     deleteUser
 };

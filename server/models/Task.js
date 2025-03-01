@@ -1,43 +1,130 @@
 import mongoose from "mongoose";
-const { Schema } = mongoose;
 
-const TaskSchema = new Schema({
+const taskSchema = new mongoose.Schema({
     title: {
         type: String,
-        default: 'No Title'
+        required: [true, "Task title is required"],
+        trim: true,
+        maxlength: [255, "Title cannot exceed 255 characters"]
     },
-    content: {
+    description: {
         type: String,
-        default: 'No Content'
+        trim: true
     },
-    date: {
-        type: Date,
-        default: Date.now
+    project: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Project",
+        required: [true, "Project reference is required"]
     },
-    contributors: {
-        type: Schema.Types.ObjectId, // don't forget that!
+    category: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Category"
+    },
+    labels: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Label"
+    }],
+    assignedTo: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    },
+    createdBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
         required: true
     },
     status: {
-        type: Number,
-        required: true
-    },
-    createdBy: {
-        type: Schema.Types.ObjectId,
-        required: true
-    },
-    dueDate: {
-        type: Date,
-        default: Date.now
-    },
-    color: {
         type: String,
-        default: "#2196f3"
+        enum: ["todo", "in_progress", "done"],
+        default: "todo"
     },
-    storyId: {
-        type: Number,
-        required: true
-    }
+    priority: {
+        type: String,
+        enum: ["low", "medium", "high"],
+        default: "medium"
+    },
+    dueDate: Date,
+    estimatedTime: {
+        type: Number, // in minutes
+        min: 0
+    },
+    actualTime: {
+        type: Number, // in minutes
+        min: 0,
+        default: 0
+    },
+    subtasks: [{
+        title: {
+            type: String,
+            required: true
+        },
+        status: {
+            type: String,
+            enum: ["todo", "in_progress", "done"],
+            default: "todo"
+        },
+        assignedTo: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+        completedAt: Date
+    }],
+    comments: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            required: true
+        },
+        content: {
+            type: String,
+            required: true
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    attachments: [{
+        fileUrl: {
+            type: String,
+            required: true
+        },
+        fileName: {
+            type: String,
+            required: true
+        },
+        fileType: String,
+        fileSize: Number,
+        uploadedBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+        uploadedAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
+    history: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+        action: String,
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }]
+}, {
+    timestamps: true
 });
 
-export default mongoose.model("Task", TaskSchema);
+// Indexes for better query performance
+taskSchema.index({ project: 1, status: 1 });
+taskSchema.index({ assignedTo: 1, status: 1 });
+taskSchema.index({ category: 1 });
+taskSchema.index({ labels: 1 });
+taskSchema.index({ dueDate: 1 });
+
+const Task = mongoose.model("Task", taskSchema);
+export default Task;
