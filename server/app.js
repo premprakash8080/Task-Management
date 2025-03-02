@@ -11,6 +11,10 @@ import indexRouter from "./routes/index.js";
 import usersRouter from "./routes/users.js";
 import tasksRouter from "./routes/tasks.js";
 import projectsRouter from "./routes/project.js";
+import messagesRouter from "./routes/messages.js";
+import notificationsRouter from "./routes/notifications.js";
+import labelsRouter from "./routes/labels.js";
+import categoriesRouter from "./routes/categories.js";
 import db from "./helper/db.js";
 
 // Initialize database
@@ -42,6 +46,10 @@ app.use("/api", indexRouter);
 app.use("/api/users", usersRouter);
 app.use("/api/tasks", tasksRouter);
 app.use("/api/projects", projectsRouter);
+app.use("/api/messages", messagesRouter);
+app.use("/api/notifications", notificationsRouter);
+app.use("/api/labels", labelsRouter);
+app.use("/api/categories", categoriesRouter);
 
 // Catch 404 and forward to error handler
 app.use((req, res, next) => {

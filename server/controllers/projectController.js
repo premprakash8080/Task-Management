@@ -3,6 +3,7 @@ import Project from "../models/Project.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import moment from 'moment';
 
 // Create Project
 const createProject = asyncHandler(async (req, res) => {
@@ -29,7 +30,56 @@ const createProject = asyncHandler(async (req, res) => {
     );
 });
 
-// Get All Projects (with filters and pagination)
+// // Get All Projects (with filters and pagination)
+// const getAllProjects = asyncHandler(async (req, res) => {
+//     const { status, priority, search, page = 1, limit = 10 } = req.query;
+//     const query = {};
+
+//     // Filter by status
+//     if (status) {
+//         query.status = status;
+//     }
+
+//     // Filter by priority
+//     if (priority) {
+//         query.priority = priority;
+//     }
+
+//     // Search in title or description
+//     if (search) {
+//         query.$or = [
+//             { title: { $regex: search, $options: 'i' } },
+//             { description: { $regex: search, $options: 'i' } }
+//         ];
+//     }
+
+//     // Filter projects where user is member or creator
+//     query.$or = [
+//         { createdBy: req.user._id },
+//         { 'members.user': req.user._id }
+//     ];
+
+//     const projects = await Project.find(query)
+//         .populate('createdBy', 'name email')
+//         .populate('members.user', 'name email')
+//         .sort({ createdAt: -1 })
+//         .skip((page - 1) * limit)
+//         .limit(limit);
+
+//     const total = await Project.countDocuments(query);
+
+//     res.status(200).json(
+//         new ApiResponse(200, {
+//             projects,
+//             pagination: {
+//                 total,
+//                 page: parseInt(page),
+//                 pages: Math.ceil(total / limit)
+//             }
+//         }, "Projects retrieved successfully")
+//     );
+// });
+
 const getAllProjects = asyncHandler(async (req, res) => {
     const { status, priority, search, page = 1, limit = 10 } = req.query;
     const query = {};
@@ -52,7 +102,7 @@ const getAllProjects = asyncHandler(async (req, res) => {
         ];
     }
 
-    // Filter projects where user is member or creator
+    // Filter projects where user is a member or creator
     query.$or = [
         { createdBy: req.user._id },
         { 'members.user': req.user._id }
@@ -65,11 +115,24 @@ const getAllProjects = asyncHandler(async (req, res) => {
         .skip((page - 1) * limit)
         .limit(limit);
 
+    // Format dates before sending the response
+    const formattedProjects = projects.map(project => ({
+        ...project._doc,
+        createdAt: moment(project.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+        updatedAt: moment(project.updatedAt).format('YYYY-MM-DD HH:mm:ss'),
+        startDate: project.startDate ? moment(project.startDate).format('YYYY-MM-DD') : null,
+        endDate: project.endDate ? moment(project.endDate).format('YYYY-MM-DD') : null,
+        members: project.members.map(member => ({
+            ...member._doc,
+            joinedAt: moment(member.joinedAt).format('YYYY-MM-DD HH:mm:ss')
+        }))
+    }));
+
     const total = await Project.countDocuments(query);
 
     res.status(200).json(
         new ApiResponse(200, {
-            projects,
+            projects: formattedProjects,
             pagination: {
                 total,
                 page: parseInt(page),

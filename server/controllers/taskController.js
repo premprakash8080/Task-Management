@@ -321,6 +321,115 @@ const getTaskStats = asyncHandler(async (req, res) => {
     );
 });
 
+// Get Tasks by Project ID
+const getTasksByProjectId = asyncHandler(async (req, res) => {
+    const { projectId } = req.params;
+    const { status, priority, search, page = 1, limit = 10 } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+        throw new ApiError(400, "Invalid project ID");
+    }
+
+    // Check if project exists and user has access
+    const project = await Project.findById(projectId);
+    if (!project) {
+        throw new ApiError(404, "Project not found");
+    }
+
+    // Check if user has access to the project
+    const isMember = project.members.some(member => 
+        member.user.toString() === req.user._id.toString()
+    );
+    const isCreator = project.createdBy.toString() === req.user._id.toString();
+
+    if (!isMember && !isCreator) {
+        throw new ApiError(403, "Not authorized to view tasks in this project");
+    }
+
+    // Build query
+    const query = { project: projectId };
+
+    // Add filters if provided
+    if (status) {
+        query.status = status;
+    }
+
+    if (priority) {
+        query.priority = priority;
+    }
+
+    if (search) {
+        query.$or = [
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const tasks = await Task.find(query)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email')
+        .populate('project', 'title')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+    const total = await Task.countDocuments(query);
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            tasks,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / limit)
+            }
+        }, "Tasks retrieved successfully")
+    );
+});
+
+// Get My Tasks (tasks assigned to logged-in user)
+const getMyTasks = asyncHandler(async (req, res) => {
+    const { status, priority, search, page = 1, limit = 10 } = req.query;
+    const query = { assignedTo: req.user._id };
+
+    // Add filters if provided
+    if (status) {
+        query.status = status;
+    }
+
+    if (priority) {
+        query.priority = priority;
+    }
+
+    if (search) {
+        query.$or = [
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    const tasks = await Task.find(query)
+        .populate('assignedTo', 'name email')
+        .populate('createdBy', 'name email')
+        .populate('project', 'title')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+    const total = await Task.countDocuments(query);
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            tasks,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / limit)
+            }
+        }, "My tasks retrieved successfully")
+    );
+});
+
 export {
     createTask,
     getAllTasks,
@@ -328,5 +437,7 @@ export {
     updateTask,
     deleteTask,
     addTaskComment,
-    getTaskStats
+    getTaskStats,
+    getTasksByProjectId,
+    getMyTasks
 };
