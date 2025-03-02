@@ -1,19 +1,27 @@
 import React from 'react';
-import MainHeader from '../common/MainHeader';
-import Footer from '../common/Footer';
+import { useNavigate } from 'react-router-dom';
+import MainHeader from '../common/MainHeader.jsx';
+import Footer from '../common/Footer.jsx';
 
 const HomePage = () => {
+    const navigate = useNavigate();
+
     return (
-        <div>
+        <div className="min-h-screen flex flex-col">
             <MainHeader />
-            <main>
+            <main className="flex-grow">
                 <section className="text-center py-16 bg-white">
                     <h1 className="text-4xl font-bold mb-4">Manage Your Tasks Efficiently</h1>
                     <p className="text-gray-600 mb-8">
                         Our platform helps you organize, prioritize, and accomplish more with seamless collaboration and time management tools.
                     </p>
                     
-                    <button className="bg-orange text-white px-6 py-3 rounded">Get Started</button>
+                    <button 
+                        className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded transition-colors duration-200"
+                        onClick={() => navigate('/signup')}
+                    >
+                        Get Started
+                    </button>
                 </section>
                 <section className="py-16 bg-gray-100">
                     <div className="container mx-auto px-4">
@@ -87,25 +95,6 @@ const HomePage = () => {
                                 <img alt="Portrait of Mark Johnson" className="w-24 h-24 rounded-full mx-auto mb-4" src="https://storage.googleapis.com/a1aa/image/orUX1v_Q1pY6ZwNHd38kaomKPmgIL7dEpS4uA70ueIs.jpg" />
                                 <p className="text-gray-600 mb-4">"The best task management tool I've used. Highly recommend it to everyone!"</p>
                                 <p className="font-semibold">- Mark Johnson, Entrepreneur</p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-                <section className="py-16 bg-white">
-                    <div className="container mx-auto px-4">
-                        <h2 className="text-3xl font-bold text-center mb-12">Pricing</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-center">
-                            <div className="bg-gray-100 p-6 rounded shadow">
-                                <h3 className="text-xl font-semibold mb-2">Free Plan</h3>
-                                <p className="text-gray-600 mb-4">Basic task management features for personal use.</p>
-                                <p className="text-2xl font-bold mb-4">$0/month</p>
-                                <button className="bg-orange-500 text-white px-6 py-3 rounded">Sign Up</button>
-                            </div>
-                            <div className="bg-gray-100 p-6 rounded shadow">
-                                <h3 className="text-xl font-semibold mb-2">Premium Plan</h3>
-                                <p className="text-gray-600 mb-4">Advanced features for teams and businesses.</p>
-                                <p className="text-2xl font-bold mb-4">$29/month</p>
-                                <button className="bg-orange-500 text-white px-6 py-3 rounded">Start Free Trial</button>
                             </div>
                         </div>
                     </div>
