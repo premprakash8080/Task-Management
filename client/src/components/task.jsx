@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import moment from 'moment';
 import Modal from './modal';
+import { taskService } from './api';
 
 const Task = ({ tasks, loading, filter }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);

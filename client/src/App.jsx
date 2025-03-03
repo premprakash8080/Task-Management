@@ -17,6 +17,8 @@ import Chat from './pages/dashboard/chat';
 import Analytics from './pages/dashboard/analytics';
 import Settings from './pages/dashboard/settings';
 import Users from './pages/dashboard/Users';
+import MyTasks from './pages/dashboard/tasks/MyTasks';
+import AllTasks from './pages/dashboard/tasks/AllTasks';
 import dotenv from 'dotenv';
 import userService from '../src/services/userService';
 
@@ -100,7 +102,9 @@ function App() {
         <Route path="projects/:projectId" element={<Projects />} />
         <Route path="projects/:projectId/tasks" element={<Tasks />} />
         <Route path="tasks" element={<Tasks />} />
-        <Route path="stories" element={<Story />} />
+        <Route path="tasks/my-tasks" element={<MyTasks />} />
+        <Route path="tasks/all-tasks" element={<AllTasks />} />
+        <Route path="tasks/:projectId" element={<Tasks />} />
         <Route path="story/:id" element={<Story />} />
         <Route path="users" element={
           <PrivateRoute requiredRoles={['admin', 'manager']}>

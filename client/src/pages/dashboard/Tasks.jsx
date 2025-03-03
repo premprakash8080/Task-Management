@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faPlus, 
@@ -7,34 +7,64 @@ import {
     faClock,
     faCheckCircle,
     faPaperclip,
-    faUserCircle
+    faUserCircle,
+    faFilter,
+    faSort,
+    faEye,
+    faEdit,
+    faTrash,
+    faUsers
 } from '@fortawesome/free-solid-svg-icons';
-import { taskService, userService } from '../../components/api';
+import { taskService, userService, projectService } from '../../components/api';
+import TaskDetailView from '../../components/TaskDetailView';
+import TaskFilters from '../../components/tasks/TaskFilters';
+import ProjectTasksView from '../../components/tasks/views/ProjectTasksView';
+import AllTasksView from '../../components/tasks/views/AllTasksView';
+import moment from 'moment';
 
 const Tasks = () => {
     const { projectId } = useParams();
+    const navigate = useNavigate();
     const [tasks, setTasks] = useState([]);
     const [users, setUsers] = useState([]);
+    const [project, setProject] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [selectedTask, setSelectedTask] = useState(null);
     const [showCommentModal, setShowCommentModal] = useState(false);
     const [newComment, setNewComment] = useState('');
+    const [filters, setFilters] = useState({
+        status: '',
+        priority: '',
+        search: '',
+        assignedTo: '',
+        dueDate: '',
+        sortBy: 'dueDate',
+        sortOrder: 'asc'
+    });
+    const [viewMode, setViewMode] = useState('board'); // 'board' or 'list'
     const [pagination, setPagination] = useState({
         total: 0,
         page: 1,
         pages: 1
     });
+    const [showTaskDetail, setShowTaskDetail] = useState(false);
+    const [projectTasks, setProjectTasks] = useState([]);
+    const [viewType, setViewType] = useState('project'); // 'project' or 'all'
+    const [groupBy, setGroupBy] = useState('status'); // 'status', 'project', or 'none'
 
     const [taskForm, setTaskForm] = useState({
         title: '',
         description: '',
         project: projectId,
-        assignedTo: '',
+        assignees: [],
         priority: 'medium',
         dueDate: '',
         estimatedTime: '',
+        status: 'todo',
+        category: '',
+        labels: [],
         subtasks: []
     });
 
@@ -42,11 +72,11 @@ const Tasks = () => {
         const init = async () => {
             try {
                 setLoading(true);
-                if (!projectId) {
-                    setError('No project selected');
-                    return;
+                if (projectId) {
+                    await Promise.all([fetchTasks(), fetchUsers(), fetchProject()]);
+                } else {
+                    await Promise.all([fetchMyTasks(), fetchUsers()]);
                 }
-                await Promise.all([fetchTasks(), fetchUsers()]);
             } catch (err) {
                 console.error('Initialization error:', err);
                 setError(err.message || 'Failed to initialize');
@@ -55,24 +85,126 @@ const Tasks = () => {
             }
         };
         init();
-    }, [projectId]);
+    }, [projectId, filters]);
+
+    const fetchProject = async () => {
+        try {
+            const projectData = await projectService.getProjectById(projectId);
+            setProject(projectData);
+        } catch (err) {
+            console.error('Error fetching project:', err);
+            setError(err.message);
+        }
+    };
 
     const fetchTasks = async () => {
         try {
             setLoading(true);
-            const response = await taskService.getTasks({ project: projectId });
+            const response = await taskService.getTasks({ 
+                project: projectId,
+                ...filters,
+                page: pagination.page
+            });
             
-            if (Array.isArray(response)) {
-                setTasks(response);
+            if (response && response.tasks) {
+                // Group tasks by status for project view
+                const groupedTasks = response.tasks.reduce((acc, task) => {
+                    if (!acc[task.status]) {
+                        acc[task.status] = [];
+                    }
+                    acc[task.status].push(task);
+                    return acc;
+                }, {});
+
+                setTasks(response.tasks);
+                setPagination(response.pagination);
                 setError('');
             } else {
-                setError('Invalid data format received');
+                setError('No tasks found');
                 setTasks([]);
+                setPagination({
+                    total: 0,
+                    page: 1,
+                    pages: 1
+                });
             }
         } catch (err) {
             console.error('Error fetching tasks:', err);
             setError(err.message || 'Failed to fetch tasks');
             setTasks([]);
+            setPagination({
+                total: 0,
+                page: 1,
+                pages: 1
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const fetchMyTasks = async () => {
+        try {
+            setLoading(true);
+            const response = await taskService.getMyTasks({
+                ...filters,
+                dueDate: filters.dueDate || undefined,
+                startDate: filters.startDate || undefined,
+                endDate: filters.endDate || undefined
+            });
+            
+            if (response && response.tasks) {
+                if (viewType === 'project') {
+                    // Group tasks by project
+                    const tasksByProject = response.tasks.reduce((acc, task) => {
+                        if (!acc[task.project._id]) {
+                            acc[task.project._id] = {
+                                _id: task.project._id,
+                                projectTitle: task.project.title,
+                                tasks: [],
+                                taskCount: 0,
+                                completedTasks: 0
+                            };
+                        }
+                        acc[task.project._id].tasks.push(task);
+                        acc[task.project._id].taskCount++;
+                        if (task.status === 'done') {
+                            acc[task.project._id].completedTasks++;
+                        }
+                        return acc;
+                    }, {});
+
+                    setProjectTasks(Object.values(tasksByProject));
+                } else {
+                    // For 'all' view, set tasks directly
+                    setTasks(response.tasks);
+                }
+                
+                setPagination(response.pagination || {
+                    total: response.tasks.length,
+                    page: 1,
+                    pages: 1
+                });
+                setError('');
+            } else {
+                setError('No tasks found');
+                setProjectTasks([]);
+                setTasks([]);
+                setPagination({
+                    total: 0,
+                    page: 1,
+                    pages: 1
+                });
+            }
+        } catch (err) {
+            console.error('Error fetching my tasks:', err);
+            setError(err.message || 'Failed to fetch tasks');
+            setProjectTasks([]);
+            setTasks([]);
+            setPagination({
+                total: 0,
+                page: 1,
+                pages: 1
+            });
         } finally {
             setLoading(false);
         }
@@ -96,6 +228,15 @@ const Tasks = () => {
         }));
     };
 
+    const handleAssigneeChange = (userId, checked) => {
+        setTaskForm(prev => {
+            const assignees = checked
+                ? [...prev.assignees, { user: userId, role: 'responsible' }]
+                : prev.assignees.filter(a => a.user !== userId);
+            return { ...prev, assignees };
+        });
+    };
+
     const handleSubtaskAdd = () => {
         setTaskForm(prev => ({
             ...prev,
@@ -115,24 +256,36 @@ const Tasks = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
+            const formData = {
+                ...taskForm,
+                dueDate: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString() : null,
+                project: taskForm.project || projectId
+            };
+
             if (selectedTask) {
-                await taskService.updateTask(selectedTask._id, taskForm);
+                await taskService.updateTask(selectedTask._id, formData);
             } else {
-                await taskService.createTask(taskForm);
+                await taskService.createTask(formData);
             }
+            
             setShowModal(false);
             setTaskForm({
                 title: '',
                 description: '',
                 project: projectId,
-                assignedTo: '',
+                assignees: [],
                 priority: 'medium',
                 dueDate: '',
                 estimatedTime: '',
+                status: 'todo',
+                category: '',
+                labels: [],
                 subtasks: []
             });
+            setSelectedTask(null);
             fetchTasks();
         } catch (err) {
+            console.error('Error saving task:', err);
             setError(err.message || 'Failed to save task');
         }
     };
@@ -159,7 +312,60 @@ const Tasks = () => {
         }
     };
 
-    if (loading) {
+    const handleCompleteTask = async (taskId) => {
+        try {
+            await taskService.markTaskComplete(taskId);
+            fetchTasks();
+        } catch (err) {
+            setError(err.message || 'Failed to complete task');
+        }
+    };
+
+    const handleFilterChange = (name, value) => {
+        // Clear the value if it's an empty string for date fields
+        const newValue = ['dueDate', 'startDate', 'endDate'].includes(name) && value === '' 
+            ? null 
+            : value;
+
+        setFilters(prev => ({ ...prev, [name]: newValue }));
+        setPagination(prev => ({ ...prev, page: 1 }));
+    };
+
+    const handlePageChange = (newPage) => {
+        setPagination(prev => ({ ...prev, page: newPage }));
+    };
+
+    const handleTaskClick = (task) => {
+        setSelectedTask(task);
+        setShowTaskDetail(true);
+    };
+
+    const handleTaskEdit = (task) => {
+        setSelectedTask(task);
+        setTaskForm({
+            title: task.title,
+            description: task.description,
+            project: task.project?._id || projectId,
+            assignees: task.assignees?.map(a => ({
+                user: a.user._id || a.user,
+                role: a.role
+            })) || [],
+            priority: task.priority || 'medium',
+            dueDate: task.dueDate ? moment(task.dueDate).format('YYYY-MM-DDTHH:mm') : '',
+            estimatedTime: task.estimatedTime || '',
+            status: task.status || 'todo',
+            category: task.category || '',
+            labels: task.labels || [],
+            subtasks: task.subtasks?.map(s => ({
+                title: s.title,
+                status: s.status || 'todo',
+                assignedTo: s.assignedTo?._id || s.assignedTo || ''
+            })) || []
+        });
+        setShowModal(true);
+    };
+
+    if (loading && !tasks.length) {
         return (
             <div className="flex items-center justify-center h-64">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -171,20 +377,93 @@ const Tasks = () => {
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-800">Tasks</h1>
-                    <p className="text-gray-500 mt-1">Manage project tasks and subtasks</p>
+                    <h1 className="text-2xl font-bold text-gray-800">
+                        {projectId ? `${project?.title} Tasks` : 'My Tasks'}
+                    </h1>
+                    <p className="text-gray-500 mt-1">
+                        {projectId ? (
+                            <span>
+                                Total Tasks: {tasks.length} • 
+                                Completed: {tasks.filter(t => t.status === 'done').length} •
+                                In Progress: {tasks.filter(t => t.status === 'in_progress').length}
+                            </span>
+                        ) : (
+                            'View and manage your assigned tasks'
+                        )}
+                    </p>
                 </div>
-                <button
-                    onClick={() => {
-                        setSelectedTask(null);
-                        setShowModal(true);
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                >
-                    <FontAwesomeIcon icon={faPlus} className="mr-2" />
-                    New Task
-                </button>
+                <div className="flex items-center space-x-4">
+                    {!projectId && (
+                        <>
+                            <div className="flex items-center space-x-2">
+                                <button
+                                    onClick={() => setViewType('project')}
+                                    className={`p-2 rounded ${
+                                        viewType === 'project' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                                    }`}
+                                >
+                                    By Project
+                                </button>
+                                <button
+                                    onClick={() => setViewType('all')}
+                                    className={`p-2 rounded ${
+                                        viewType === 'all' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                                    }`}
+                                >
+                                    All Tasks
+                                </button>
+                            </div>
+                            {viewType === 'all' && (
+                                <div className="flex items-center space-x-2">
+                                    <select
+                                        value={groupBy}
+                                        onChange={(e) => setGroupBy(e.target.value)}
+                                        className="rounded-md border-gray-300"
+                                    >
+                                        <option value="status">Group by Status</option>
+                                        <option value="project">Group by Project</option>
+                                        <option value="none">No Grouping</option>
+                                    </select>
+                                </div>
+                            )}
+                        </>
+                    )}
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={() => setViewMode('board')}
+                            className={`p-2 rounded ${
+                                viewMode === 'board' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                            }`}
+                        >
+                            Board View
+                        </button>
+                        <button
+                            onClick={() => setViewMode('list')}
+                            className={`p-2 rounded ${
+                                viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-600'
+                            }`}
+                        >
+                            List View
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => {
+                            setSelectedTask(null);
+                            setShowModal(true);
+                        }}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                    >
+                        <FontAwesomeIcon icon={faPlus} className="mr-2" />
+                        New Task
+                    </button>
+                </div>
             </div>
+
+            <TaskFilters
+                filters={filters}
+                users={users}
+                onFilterChange={handleFilterChange}
+            />
 
             {error && (
                 <div className="bg-red-50 text-red-500 p-4 rounded-lg mb-6">
@@ -192,76 +471,56 @@ const Tasks = () => {
                 </div>
             )}
 
-            <div className="grid gap-6">
-                {tasks.map((task) => (
-                    <div key={task._id} className="bg-white rounded-lg shadow-sm p-6">
-                        <div className="flex justify-between items-start">
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">{task.title}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{task.description}</p>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                    task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                    task.priority === 'medium' ? 'bg-orange-100 text-orange-800' :
-                                    'bg-green-100 text-green-800'
-                                }`}>
-                                    {task.priority}
-                                </span>
-                                <button
-                                    onClick={() => {
-                                        setSelectedTask(task);
-                                        setTaskForm(task);
-                                        setShowModal(true);
-                                    }}
-                                    className="text-gray-400 hover:text-gray-600"
-                                >
-                                    <FontAwesomeIcon icon={faPaperclip} />
-                                </button>
-                            </div>
-                        </div>
+            {projectId ? (
+                <AllTasksView
+                    tasks={tasks}
+                    viewMode={viewMode}
+                    groupBy="status"
+                    onTaskClick={handleTaskClick}
+                    onTaskComplete={handleCompleteTask}
+                    onTaskEdit={handleTaskEdit}
+                    onTaskDelete={handleDeleteTask}
+                />
+            ) : (
+                viewType === 'project' ? (
+                    <ProjectTasksView
+                        projectTasks={projectTasks}
+                        onTaskClick={handleTaskClick}
+                        onTaskComplete={handleCompleteTask}
+                        onTaskEdit={handleTaskEdit}
+                        onTaskDelete={handleDeleteTask}
+                    />
+                ) : (
+                    <AllTasksView
+                        tasks={tasks}
+                        viewMode={viewMode}
+                        groupBy={groupBy}
+                        onTaskClick={handleTaskClick}
+                        onTaskComplete={handleCompleteTask}
+                        onTaskEdit={handleTaskEdit}
+                        onTaskDelete={handleDeleteTask}
+                    />
+                )
+            )}
 
-                        <div className="mt-4 space-y-3">
-                            <div className="flex items-center text-sm text-gray-600">
-                                <FontAwesomeIcon icon={faUserCircle} className="mr-2" />
-                                Assigned to: {users.find(u => u._id === task.assignedTo)?.name || 'Unassigned'}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <FontAwesomeIcon icon={faClock} className="mr-2" />
-                                Due: {new Date(task.dueDate).toLocaleDateString()}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <FontAwesomeIcon icon={faComment} className="mr-2" />
-                                {task.comments?.length || 0} comments
-                            </div>
-                        </div>
+            {/* Task Detail Modal */}
+            {showTaskDetail && selectedTask && (
+                <TaskDetailView
+                    task={selectedTask}
+                    onClose={() => {
+                        setShowTaskDetail(false);
+                        setSelectedTask(null);
+                    }}
+                    onUpdate={() => {
+                        fetchTasks();
+                    }}
+                />
+            )}
 
-                        {task.subtasks?.length > 0 && (
-                            <div className="mt-4">
-                                <h4 className="text-sm font-medium text-gray-700 mb-2">Subtasks</h4>
-                                <div className="space-y-2">
-                                    {task.subtasks.map((subtask, index) => (
-                                        <div key={index} className="flex items-center">
-                                            <FontAwesomeIcon 
-                                                icon={faCheckCircle} 
-                                                className={`mr-2 ${
-                                                    subtask.status === 'completed' ? 'text-green-500' : 'text-gray-300'
-                                                }`}
-                                            />
-                                            <span className="text-sm text-gray-600">{subtask.title}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-
-            {/* Task Modal */}
+            {/* Task Form Modal */}
             {showModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-[600px] shadow-lg rounded-md bg-white">
+                    <div className="relative top-20 mx-auto p-5 border w-[800px] shadow-lg rounded-md bg-white">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-medium text-gray-900">
                                 {selectedTask ? 'Edit Task' : 'Create New Task'}
@@ -274,16 +533,33 @@ const Tasks = () => {
                             </button>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Title</label>
-                                <input
-                                    type="text"
-                                    name="title"
-                                    value={taskForm.title}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    required
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Title</label>
+                                    <input
+                                        type="text"
+                                        name="title"
+                                        value={taskForm.title}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                                    <select
+                                        name="status"
+                                        value={taskForm.status}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    >
+                                        <option value="backlog">Backlog</option>
+                                        <option value="todo">To Do</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="in_review">In Review</option>
+                                        <option value="done">Done</option>
+                                    </select>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Description</label>
@@ -296,57 +572,62 @@ const Tasks = () => {
                                     required
                                 ></textarea>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Assigned To</label>
-                                <select
-                                    name="assignedTo"
-                                    value={taskForm.assignedTo}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                >
-                                    <option value="">Select User</option>
-                                    {users.map(user => (
-                                        <option key={user._id} value={user._id}>
-                                            {user.name}
-                                        </option>
-                                    ))}
-                                </select>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Assignees</label>
+                                    <div className="mt-1 max-h-40 overflow-y-auto border rounded-md p-2">
+                                        {users.map(user => (
+                                            <label key={user._id} className="flex items-center p-2 hover:bg-gray-50">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={taskForm.assignees.some(a => a.user === user._id)}
+                                                    onChange={(e) => handleAssigneeChange(user._id, e.target.checked)}
+                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                                />
+                                                <span className="ml-2">{user.name}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Priority</label>
+                                    <select
+                                        name="priority"
+                                        value={taskForm.priority}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    >
+                                        <option value="low">Low</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="high">High</option>
+                                        <option value="urgent">Urgent</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Priority</label>
-                                <select
-                                    name="priority"
-                                    value={taskForm.priority}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Due Date</label>
-                                <input
-                                    type="datetime-local"
-                                    name="dueDate"
-                                    value={taskForm.dueDate}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Estimated Time (minutes)
-                                </label>
-                                <input
-                                    type="number"
-                                    name="estimatedTime"
-                                    value={taskForm.estimatedTime}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                />
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Due Date</label>
+                                    <input
+                                        type="datetime-local"
+                                        name="dueDate"
+                                        value={taskForm.dueDate}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        required
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">
+                                        Estimated Time (minutes)
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="estimatedTime"
+                                        value={taskForm.estimatedTime}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    />
+                                </div>
                             </div>
 
                             {/* Subtasks */}
@@ -362,18 +643,18 @@ const Tasks = () => {
                                     </button>
                                 </div>
                                 {taskForm.subtasks.map((subtask, index) => (
-                                    <div key={index} className="flex gap-2 mt-2">
+                                    <div key={index} className="grid grid-cols-3 gap-2 mt-2">
                                         <input
                                             type="text"
                                             value={subtask.title}
                                             onChange={(e) => handleSubtaskChange(index, 'title', e.target.value)}
                                             placeholder="Subtask title"
-                                            className="flex-1 rounded-md border-gray-300"
+                                            className="col-span-2 rounded-md border-gray-300"
                                         />
                                         <select
                                             value={subtask.assignedTo}
                                             onChange={(e) => handleSubtaskChange(index, 'assignedTo', e.target.value)}
-                                            className="w-40 rounded-md border-gray-300"
+                                            className="rounded-md border-gray-300"
                                         >
                                             <option value="">Assign to</option>
                                             {users.map(user => (
@@ -406,43 +687,24 @@ const Tasks = () => {
                 </div>
             )}
 
-            {/* Comment Modal */}
-            {showCommentModal && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">Add Comment</h3>
-                            <button 
-                                onClick={() => setShowCommentModal(false)}
-                                className="text-gray-400 hover:text-gray-500"
+            {/* Pagination */}
+            {pagination.pages > 1 && (
+                <div className="flex justify-center mt-6">
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                        {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(page => (
+                            <button
+                                key={page}
+                                onClick={() => handlePageChange(page)}
+                                className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                    page === pagination.page
+                                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                                }`}
                             >
-                                ×
+                                {page}
                             </button>
-                        </div>
-                        <div className="space-y-4">
-                            <textarea
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
-                                rows="4"
-                                className="w-full rounded-md border-gray-300"
-                                placeholder="Write your comment..."
-                            ></textarea>
-                            <div className="flex justify-end space-x-3">
-                                <button
-                                    onClick={() => setShowCommentModal(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAddComment}
-                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-                                >
-                                    Add Comment
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                        ))}
+                    </nav>
                 </div>
             )}
         </div>

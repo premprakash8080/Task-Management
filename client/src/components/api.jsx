@@ -1,4 +1,5 @@
 import axios from 'axios';
+import moment from 'moment';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9000/api';
 
@@ -230,7 +231,17 @@ export const taskService = {
     // Create task
     createTask: async (taskData) => {
         try {
-            const response = await api.post('/tasks', taskData);
+            // Format dates before sending
+            const formattedData = {
+                ...taskData,
+                dueDate: taskData.dueDate ? moment(taskData.dueDate).format('YYYY-MM-DD') : null,
+                subtasks: taskData.subtasks?.map(subtask => ({
+                    ...subtask,
+                    dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null
+                }))
+            };
+
+            const response = await api.post('/tasks', formattedData);
             return response.data.data;
         } catch (error) {
             throw error.response?.data?.message || error.message;
@@ -240,7 +251,7 @@ export const taskService = {
     // Add comment to task
     addTaskComment: async (taskId, commentData) => {
         try {
-            const response = await api.post(`/tasks/${taskId}`, commentData);
+            const response = await api.post(`/tasks/${taskId}/comments`, commentData);
             return response.data.data;
         } catch (error) {
             throw error.response?.data?.message || error.message;
@@ -250,7 +261,17 @@ export const taskService = {
     // Update task
     updateTask: async (taskId, taskData) => {
         try {
-            const response = await api.put(`/tasks/${taskId}`, taskData);
+            // Format dates before sending
+            const formattedData = {
+                ...taskData,
+                dueDate: taskData.dueDate ? moment(taskData.dueDate).format('YYYY-MM-DD') : null,
+                subtasks: taskData.subtasks?.map(subtask => ({
+                    ...subtask,
+                    dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null
+                }))
+            };
+
+            const response = await api.put(`/tasks/${taskId}`, formattedData);
             return response.data.data;
         } catch (error) {
             throw error.response?.data?.message || error.message;
@@ -270,27 +291,47 @@ export const taskService = {
     // Get tasks by project
     getTasks: async (filters = {}) => {
         try {
-            const { project, ...otherFilters } = filters;
-            const queryParams = new URLSearchParams(otherFilters).toString();
+            const { project, startDate, endDate, ...otherFilters } = filters;
             
-            // Use the correct endpoint for project tasks
+            // Remove empty values and format dates
+            const formattedFilters = Object.entries({
+                ...otherFilters,
+                startDate: startDate && startDate !== 'undefined' ? moment(startDate).format('YYYY-MM-DD') : undefined,
+                endDate: endDate && endDate !== 'undefined' ? moment(endDate).format('YYYY-MM-DD') : undefined
+            }).reduce((acc, [key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {});
+            
+            // Use the project-specific endpoint if project ID is provided
             const endpoint = project 
-                ? `/tasks/project/${project}${queryParams ? `?${queryParams}` : ''}`
-                : `/tasks${queryParams ? `?${queryParams}` : ''}`;
+                ? `/tasks/project/${project}`
+                : '/tasks';
             
-            const response = await api.get(endpoint);
+            const queryParams = new URLSearchParams(formattedFilters).toString();
+            const response = await api.get(`${endpoint}${queryParams ? `?${queryParams}` : ''}`);
             
-            // Handle the correct response structure
-            if (response.data && response.data.data && response.data.data.tasks) {
-                return response.data.data.tasks;
+            if (response.data && response.data.data) {
+                return {
+                    tasks: response.data.data.tasks || [],
+                    pagination: response.data.data.pagination || {
+                        total: response.data.data.tasks?.length || 0,
+                        page: 1,
+                        pages: 1
+                    }
+                };
             }
             
-            // Fallback handling
-            if (Array.isArray(response.data.data)) {
-                return response.data.data;
-            }
-            
-            return [];
+            return {
+                tasks: [],
+                pagination: {
+                    total: 0,
+                    page: 1,
+                    pages: 1
+                }
+            };
         } catch (error) {
             console.error('Error fetching tasks:', error);
             throw error.response?.data?.message || error.message;
@@ -307,17 +348,41 @@ export const taskService = {
         }
     },
 
-    // Get my tasks (tasks assigned to logged-in user)
+    // Get my tasks
     getMyTasks: async (filters = {}) => {
         try {
-            const queryParams = new URLSearchParams(filters).toString();
+            const { startDate, endDate, dueDate, ...otherFilters } = filters;
+            
+            // Remove empty string values and format dates
+            const formattedFilters = Object.entries(otherFilters).reduce((acc, [key, value]) => {
+                if (value !== '' && value !== undefined && value !== null) {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {});
+
+            // Add formatted dates if they exist
+            if (startDate && startDate !== 'undefined') {
+                formattedFilters.startDate = moment(startDate).format('YYYY-MM-DD');
+            }
+            if (endDate && endDate !== 'undefined') {
+                formattedFilters.endDate = moment(endDate).format('YYYY-MM-DD');
+            }
+            if (dueDate && dueDate !== 'undefined') {
+                formattedFilters.dueDate = moment(dueDate).format('YYYY-MM-DD');
+            }
+            
+            const queryParams = new URLSearchParams(formattedFilters).toString();
             const response = await api.get(`/tasks/my-tasks${queryParams ? `?${queryParams}` : ''}`);
             
-            // Handle the correct response structure
-            if (response.data && response.data.data && response.data.data.tasks) {
+            if (response.data && response.data.data) {
                 return {
-                    tasks: response.data.data.tasks,
-                    pagination: response.data.data.pagination
+                    tasks: response.data.data.tasks || [],
+                    pagination: response.data.data.pagination || {
+                        total: 0,
+                        page: 1,
+                        pages: 1
+                    }
                 };
             }
             
@@ -347,32 +412,61 @@ export const messageService = {
         }
     },
 
-    // Get chat messages with a specific user
-    getChatMessages: async (userId, page = 1, limit = 50) => {
+    // Get chat messages with a specific user or project
+    getChatMessages: async (userId = null, projectId = null, page = 1, limit = 50) => {
         try {
-            const response = await api.get(`/messages/${userId}`, {
+            const endpoint = userId 
+                ? `/messages/user/${userId}`
+                : `/messages/project/${projectId}`;
+            
+            const response = await api.get(endpoint, {
                 params: { page, limit }
             });
-            return response.data.data;
+
+            // Transform messages to include proper user data
+            const messages = response.data.data.messages.map(message => ({
+                ...message,
+                sender: message.sender || { _id: message.sender, name: 'Unknown' },
+                recipient: message.recipient || null
+            }));
+
+            return {
+                ...response.data.data,
+                messages
+            };
         } catch (error) {
             throw error.response?.data?.message || error.message;
         }
     },
 
     // Get recent chats
-    getRecentChats: async () => {
+    getRecentChats: async (projectId = null) => {
         try {
-            const response = await api.get('/messages/chats');
-            return response.data.data;
+            const response = await api.get('/messages/chats', {
+                params: { projectId }
+            });
+
+            // Transform chat data to ensure consistent structure
+            const chats = response.data.data.map(chat => ({
+                ...chat,
+                user: chat.user || { _id: chat._id, name: 'Unknown' },
+                lastMessage: chat.lastMessage || { content: 'No messages yet', createdAt: new Date() }
+            }));
+
+            return chats;
         } catch (error) {
             throw error.response?.data?.message || error.message;
         }
     },
 
     // Mark messages as read
-    markMessagesAsRead: async (userId) => {
+    markMessagesAsRead: async (userId = null, projectId = null) => {
         try {
-            const response = await api.put(`/messages/${userId}/read`);
+            const endpoint = userId 
+                ? `/messages/user/${userId}/read`
+                : `/messages/project/${projectId}/read`;
+            
+            const response = await api.put(endpoint);
             return response.data.data;
         } catch (error) {
             throw error.response?.data?.message || error.message;
@@ -390,10 +484,172 @@ export const messageService = {
     },
 
     // Get unread message count
+    getUnreadCount: async (projectId = null) => {
+        try {
+            const response = await api.get('/messages/unread/count', {
+                params: { projectId }
+            });
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    }
+};
+
+export const categoryService = {
+    // Create a new category
+    createCategory: async (categoryData) => {
+        try {
+            const response = await api.post('/categories', categoryData);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get categories (all or project-specific)
+    getCategories: async (projectId = null) => {
+        try {
+            const url = projectId 
+                ? `/categories?projectId=${projectId}`
+                : '/categories';
+            
+            const response = await api.get(url);
+            
+            // Handle the correct response structure
+            if (response.data && response.data.data) {
+                return response.data.data;
+            }
+            
+            return [];
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Update a category
+    updateCategory: async (categoryId, updateData) => {
+        try {
+            const response = await api.put(`/categories/${categoryId}`, updateData);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Delete a category
+    deleteCategory: async (categoryId) => {
+        try {
+            const response = await api.delete(`/categories/${categoryId}`);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    }
+};
+
+export const labelService = {
+    // Create a new label
+    createLabel: async (labelData) => {
+        try {
+            const response = await api.post('/labels', labelData);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get labels for a project
+    getLabels: async (projectId) => {
+        try {
+            const response = await api.get('/labels', {
+                params: { projectId }
+            });
+            return response.data.data;
+        } catch (error) {
+            console.error('Error fetching labels:', error);
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Update a label
+    updateLabel: async (labelId, updateData) => {
+        try {
+            const response = await api.put(`/labels/${labelId}`, updateData);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Delete a label
+    deleteLabel: async (labelId) => {
+        try {
+            const response = await api.delete(`/labels/${labelId}`);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    }
+};
+
+export const notificationService = {
+    // Get user's notifications with filters
+    getNotifications: async (filters = {}) => {
+        try {
+            const response = await api.get('/notifications', { params: filters });
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Mark a notification as read
+    markAsRead: async (notificationId) => {
+        try {
+            const response = await api.put(`/notifications/${notificationId}/read`);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Mark all notifications as read
+    markAllAsRead: async () => {
+        try {
+            const response = await api.put('/notifications/mark-all-read');
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Archive a notification
+    archiveNotification: async (notificationId) => {
+        try {
+            const response = await api.put(`/notifications/${notificationId}/archive`);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Delete a notification
+    deleteNotification: async (notificationId) => {
+        try {
+            const response = await api.delete(`/notifications/${notificationId}`);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get unread notification count
     getUnreadCount: async () => {
         try {
-            const response = await api.get('/messages/unread/count');
-            return response.data.data;
+            const response = await api.get('/notifications/unread/count');
+            return response.data.data.count;
         } catch (error) {
             throw error.response?.data?.message || error.message;
         }

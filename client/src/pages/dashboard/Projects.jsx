@@ -9,9 +9,14 @@ import {
     faTag,
     faEdit,
     faTrash,
-    faUserPlus
+    faUserPlus,
+    faTags,
+    faList,
+    faComments,
+    faUser
 } from '@fortawesome/free-solid-svg-icons';
-import { projectService, userService } from '../../components/api';
+import { projectService, userService, categoryService, taskService } from '../../components/api';
+import LabelManager from '../../components/LabelManager';
 
 const Projects = () => {
     const { projectId } = useParams();
@@ -50,6 +55,24 @@ const Projects = () => {
         role: 'member'
     });
 
+    const [categories, setCategories] = useState([]);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null);
+    const [categoryForm, setCategoryForm] = useState({
+        name: '',
+        description: '',
+        color: '#000000',
+        icon: '',
+        isGlobal: false,
+        projectId: ''
+    });
+
+    const [showLabelManager, setShowLabelManager] = useState(false);
+
+    const [projectTasks, setProjectTasks] = useState({});
+    const [selectedTask, setSelectedTask] = useState(null);
+    const [showTaskDetail, setShowTaskDetail] = useState(false);
+
     useEffect(() => {
         const init = async () => {
             try {
@@ -60,8 +83,8 @@ const Projects = () => {
                     navigate('/login');
                     return;
                 }
-                await fetchProjects();
-                await fetchUsers();
+                await Promise.all([fetchProjects(), fetchUsers()]);
+                await fetchCategories();
             } catch (err) {
                 console.error('Initialization error:', err);
                 setError(err.message || 'Failed to initialize');
@@ -122,6 +145,28 @@ const Projects = () => {
             });
         } catch (err) {
             setError(err.message || 'Failed to fetch project details');
+        }
+    };
+
+    const fetchCategories = async (projectId = null) => {
+        try {
+            const data = await categoryService.getCategories(projectId);
+            setCategories(data);
+        } catch (err) {
+            console.error('Failed to fetch categories:', err);
+            setError(err.message || 'Failed to fetch categories');
+        }
+    };
+
+    const fetchProjectTasks = async (projectId) => {
+        try {
+            const response = await taskService.getTasks({ project: projectId });
+            setProjectTasks(prev => ({
+                ...prev,
+                [projectId]: response.tasks
+            }));
+        } catch (err) {
+            console.error('Error fetching project tasks:', err);
         }
     };
 
@@ -213,6 +258,126 @@ const Projects = () => {
         }));
     };
 
+    const handleCategorySubmit = async (e) => {
+        e.preventDefault();
+        try {
+            if (selectedCategory) {
+                await categoryService.updateCategory(selectedCategory._id, categoryForm);
+            } else {
+                await categoryService.createCategory(categoryForm);
+            }
+            setShowCategoryModal(false);
+            setCategoryForm({
+                name: '',
+                description: '',
+                color: '#000000',
+                icon: '',
+                isGlobal: false,
+                projectId: ''
+            });
+            await fetchCategories(selectedProject?._id);
+        } catch (err) {
+            setError(err.message || 'Failed to save category');
+        }
+    };
+
+    const handleDeleteCategory = async (categoryId) => {
+        if (window.confirm('Are you sure you want to delete this category?')) {
+            try {
+                await categoryService.deleteCategory(categoryId);
+                await fetchCategories(selectedProject?._id);
+            } catch (err) {
+                setError(err.message || 'Failed to delete category');
+            }
+        }
+    };
+
+    const handleTaskClick = (task) => {
+        setSelectedTask(task);
+        setShowTaskDetail(true);
+    };
+
+    const ProjectTaskList = ({ project }) => {
+        const tasks = projectTasks[project._id] || [];
+        
+        return (
+            <div className="mt-4">
+                <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-lg font-medium">Tasks</h3>
+                    <Link
+                        to={`/dashboard/tasks?project=${project._id}`}
+                        className="text-sm text-blue-600 hover:text-blue-800"
+                    >
+                        View All Tasks
+                    </Link>
+                </div>
+                <div className="space-y-2">
+                    {tasks.slice(0, 5).map(task => (
+                        <div
+                            key={task._id}
+                            onClick={() => handleTaskClick(task)}
+                            className="bg-white p-3 rounded-lg shadow-sm hover:shadow cursor-pointer"
+                        >
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h4 className="font-medium">{task.title}</h4>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                        {task.description.substring(0, 100)}
+                                        {task.description.length > 100 ? '...' : ''}
+                                    </p>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                                        task.priority === 'medium' ? 'bg-orange-100 text-orange-800' :
+                                        'bg-green-100 text-green-800'
+                                    }`}>
+                                        {task.priority}
+                                    </span>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                        task.status === 'done' ? 'bg-green-100 text-green-800' :
+                                        task.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-gray-100 text-gray-800'
+                                    }`}>
+                                        {task.status.replace('_', ' ')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center mt-3">
+                                <div className="flex -space-x-2">
+                                    {task.assignees.map(assignee => (
+                                        <img
+                                            key={assignee.user._id}
+                                            src={assignee.user.profilePhoto || '/default-avatar.png'}
+                                            alt={assignee.user.name}
+                                            className="w-6 h-6 rounded-full border-2 border-white"
+                                            title={assignee.user.name}
+                                        />
+                                    ))}
+                                </div>
+                                {task.dueDate && (
+                                    <span className="text-sm text-gray-500">
+                                        Due: {new Date(task.dueDate).toLocaleDateString()}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {tasks.length > 5 && (
+                        <div className="text-center mt-2">
+                            <Link
+                                to={`/dashboard/tasks?project=${project._id}`}
+                                className="text-sm text-gray-500 hover:text-gray-700"
+                            >
+                                View {tasks.length - 5} more tasks
+                            </Link>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     if (loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -220,6 +385,405 @@ const Projects = () => {
             </div>
         );
     }
+
+    const categoryModal = (
+        showCategoryModal && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-[500px] shadow-lg rounded-md bg-white">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-medium text-gray-900">
+                            {selectedCategory ? 'Edit Category' : 'Create New Category'}
+                        </h3>
+                        <button 
+                            onClick={() => setShowCategoryModal(false)}
+                            className="text-gray-400 hover:text-gray-500"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <form onSubmit={handleCategorySubmit} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Category Name</label>
+                            <input
+                                type="text"
+                                value={categoryForm.name}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, name: e.target.value }))}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Description</label>
+                            <textarea
+                                value={categoryForm.description}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, description: e.target.value }))}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                rows="3"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Color</label>
+                            <input
+                                type="color"
+                                value={categoryForm.color}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, color: e.target.value }))}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Icon (FontAwesome class)</label>
+                            <input
+                                type="text"
+                                value={categoryForm.icon}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, icon: e.target.value }))}
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                placeholder="fa-tag"
+                            />
+                        </div>
+                        <div className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="isGlobal"
+                                checked={categoryForm.isGlobal}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, isGlobal: e.target.checked }))}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <label htmlFor="isGlobal" className="ml-2 block text-sm text-gray-700">
+                                Global Category
+                            </label>
+                        </div>
+                        {!categoryForm.isGlobal && selectedProject && (
+                            <input
+                                type="hidden"
+                                value={selectedProject._id}
+                                onChange={(e) => setCategoryForm(prev => ({ ...prev, projectId: e.target.value }))}
+                            />
+                        )}
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                type="button"
+                                onClick={() => setShowCategoryModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                            >
+                                {selectedCategory ? 'Update Category' : 'Create Category'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )
+    );
+
+    const categoryButton = (
+        <button
+            onClick={() => {
+                setSelectedCategory(null);
+                setCategoryForm({
+                    name: '',
+                    description: '',
+                    color: '#000000',
+                    icon: '',
+                    isGlobal: false,
+                    projectId: selectedProject?._id || ''
+                });
+                setShowCategoryModal(true);
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+        >
+            <FontAwesomeIcon icon={faTags} className="mr-2" />
+            Manage Categories
+        </button>
+    );
+
+    const labelManagerModal = (
+        showLabelManager && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-[600px] shadow-lg rounded-md bg-white">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-medium text-gray-900">
+                            Manage Labels
+                        </h3>
+                        <button 
+                            onClick={() => setShowLabelManager(false)}
+                            className="text-gray-400 hover:text-gray-500"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <LabelManager 
+                        projectId={selectedProject?._id} 
+                        onLabelSelect={(label) => {
+                            // Handle label selection if needed
+                            console.log('Selected label:', label);
+                        }}
+                    />
+                </div>
+            </div>
+        )
+    );
+
+    const labelButton = selectedProject && (
+        <button
+            onClick={() => setShowLabelManager(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
+        >
+            <FontAwesomeIcon icon={faList} className="mr-2" />
+            Manage Labels
+        </button>
+    );
+
+    const categoriesSection = (project) => (
+        <div className="mt-3">
+            <h4 className="text-sm font-medium text-gray-700 mb-2">Categories</h4>
+            <div className="flex flex-wrap gap-2">
+                {categories
+                    .filter(cat => cat.isGlobal || cat.projectId === project._id)
+                    .map(category => (
+                        <span
+                            key={category._id}
+                            className="px-2 py-1 rounded-full text-xs font-medium"
+                            style={{ backgroundColor: category.color + '20', color: category.color }}
+                        >
+                            {category.icon && <FontAwesomeIcon icon={category.icon} className="mr-1" />}
+                            {category.name}
+                        </span>
+                    ))
+                }
+            </div>
+        </div>
+    );
+
+    const projectModal = (
+        showModal && (
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+                <div className="relative top-20 mx-auto p-5 border w-[800px] shadow-lg rounded-md bg-white">
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-medium text-gray-900">
+                            {selectedProject ? 'Edit Project' : 'Create New Project'}
+                        </h3>
+                        <button 
+                            onClick={() => setShowModal(false)}
+                            className="text-gray-400 hover:text-gray-500"
+                        >
+                            ×
+                        </button>
+                    </div>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Project Title</label>
+                                <input
+                                    type="text"
+                                    name="title"
+                                    value={projectForm.title}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Priority</label>
+                                <select
+                                    name="priority"
+                                    value={projectForm.priority}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                >
+                                    <option value="low">Low</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Description</label>
+                            <textarea
+                                name="description"
+                                value={projectForm.description}
+                                onChange={handleInputChange}
+                                rows="3"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                required
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Start Date</label>
+                                <input
+                                    type="date"
+                                    name="startDate"
+                                    value={projectForm.startDate}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">End Date</label>
+                                <input
+                                    type="date"
+                                    name="endDate"
+                                    value={projectForm.endDate}
+                                    onChange={handleInputChange}
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700">Tags</label>
+                            <input
+                                type="text"
+                                name="tags"
+                                value={projectForm.tags.join(', ')}
+                                onChange={handleInputChange}
+                                placeholder="Enter tags separated by commas"
+                                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                            />
+                        </div>
+
+                        {selectedProject && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Team Members</label>
+                                <div className="space-y-2">
+                                    {selectedProject.members.map(member => (
+                                        <div key={member.user._id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                            <div className="flex items-center">
+                                                <span className="font-medium">{member.user.name}</span>
+                                                <span className="text-sm text-gray-500 ml-2">({member.role})</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleRemoveMember(member.user._id)}
+                                                className="text-red-600 hover:text-red-800"
+                                            >
+                                                <FontAwesomeIcon icon={faTrash} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowMemberModal(true)}
+                                        className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                                    >
+                                        <FontAwesomeIcon icon={faUserPlus} className="mr-2" />
+                                        Add Member
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end space-x-3 pt-4">
+                            <button
+                                type="button"
+                                onClick={() => setShowModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
+                            >
+                                {selectedProject ? 'Update Project' : 'Create Project'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        )
+    );
+
+    const projectCard = (project) => (
+        <div key={project._id} className="bg-white rounded-lg shadow-sm p-6 mb-4">
+            <div className="flex justify-between items-start">
+                <div>
+                    <h3 className="text-xl font-semibold text-gray-900">{project.title}</h3>
+                    <p className="text-gray-600 mt-1">{project.description}</p>
+                </div>
+                <div className="flex space-x-2">
+                    <button
+                        onClick={() => {
+                            navigate(`/dashboard/chat?projectId=${project._id}&projectTitle=${encodeURIComponent(project.title)}`);
+                        }}
+                        className="text-blue-600 hover:text-blue-800"
+                        title="Team Chat"
+                    >
+                        <FontAwesomeIcon icon={faComments} />
+                    </button>
+                    <button
+                        onClick={() => {
+                            setSelectedProject(project);
+                            setProjectForm({
+                                title: project.title,
+                                description: project.description,
+                                startDate: project.startDate,
+                                endDate: project.endDate,
+                                priority: project.priority,
+                                tags: project.tags || []
+                            });
+                            setShowModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800"
+                    >
+                        <FontAwesomeIcon icon={faEdit} />
+                    </button>
+                    <button
+                        onClick={() => handleDelete(project._id)}
+                        className="text-red-600 hover:text-red-800"
+                    >
+                        <FontAwesomeIcon icon={faTrash} />
+                    </button>
+                </div>
+            </div>
+            
+            <div className="mt-4 flex flex-wrap gap-2">
+                {project.tags && project.tags.map((tag, index) => (
+                    <span
+                        key={index}
+                        className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                    >
+                        {tag}
+                    </span>
+                ))}
+            </div>
+
+            <div className="mt-4">
+                <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <FontAwesomeIcon icon={faCalendarAlt} />
+                    <span>
+                        {new Date(project.startDate).toLocaleDateString()} - 
+                        {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'Ongoing'}
+                    </span>
+                </div>
+            </div>
+
+            <div className="mt-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">Team Members</h4>
+                <div className="flex flex-wrap gap-2">
+                    {project.members.map(member => (
+                        <span
+                            key={member.user._id}
+                            className="px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center"
+                        >
+                            <FontAwesomeIcon icon={faUser} className="mr-1" />
+                            {member.user.name}
+                        </span>
+                    ))}
+                </div>
+            </div>
+
+            <ProjectTaskList project={project} />
+        </div>
+    );
 
     return (
         <div className="p-6">
@@ -229,6 +793,8 @@ const Projects = () => {
                     <p className="text-gray-500 mt-1">Manage and track your projects</p>
                 </div>
                 <div className="flex space-x-4">
+                    {categoryButton}
+                    {labelButton}
                     {selectedProject && (
                         <button
                             onClick={() => setShowMemberModal(true)}
@@ -301,192 +867,11 @@ const Projects = () => {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
-                    <div key={project._id} className="bg-white rounded-lg shadow-sm p-6">
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
-                                <h3 className="text-lg font-semibold text-gray-800">{project.title}</h3>
-                                <p className="text-sm text-gray-500 mt-1">{project.description}</p>
-                            </div>
-                            <div className="flex flex-col items-end">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                    project.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    project.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-yellow-100 text-yellow-800'
-                                }`}>
-                                    {project.status}
-                                </span>
-                                <span className={`mt-2 px-2 py-1 rounded-full text-xs font-semibold ${
-                                    project.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                    project.priority === 'medium' ? 'bg-orange-100 text-orange-800' :
-                                    'bg-green-100 text-green-800'
-                                }`}>
-                                    {project.priority}
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {project.tags?.map((tag, index) => (
-                                    <span key={index} className="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-xs flex items-center">
-                                        <FontAwesomeIcon icon={faTag} className="mr-1" />
-                                        {tag}
-                                    </span>
-                                ))}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <FontAwesomeIcon icon={faCalendarAlt} className="mr-2" />
-                                {new Date(project.startDate).toLocaleDateString()} - {new Date(project.endDate).toLocaleDateString()}
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600">
-                                <FontAwesomeIcon icon={faUsers} className="mr-2" />
-                                {project.members?.length || 0} members
-                            </div>
-                        </div>
-
-                        <div className="mt-4 flex justify-between items-center">
-                            <Link
-                                to={`/dashboard/projects/${project._id}/tasks`}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-medium"
-                            >
-                                <FontAwesomeIcon icon={faTasks} className="mr-1" />
-                                View Tasks
-                            </Link>
-                            <div className="flex space-x-2">
-                                <button
-                                    onClick={() => {
-                                        setSelectedProject(project);
-                                        setProjectForm({
-                                            title: project.title,
-                                            description: project.description,
-                                            startDate: project.startDate,
-                                            endDate: project.endDate,
-                                            priority: project.priority,
-                                            tags: project.tags || []
-                                        });
-                                        setShowModal(true);
-                                    }}
-                                    className="text-blue-600 hover:text-blue-800"
-                                >
-                                    <FontAwesomeIcon icon={faEdit} />
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(project._id)}
-                                    className="text-red-600 hover:text-red-800"
-                                >
-                                    <FontAwesomeIcon icon={faTrash} />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    projectCard(project)
                 ))}
             </div>
 
-            {/* Project Modal */}
-            {showModal && (
-                <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-                    <div className="relative top-20 mx-auto p-5 border w-[600px] shadow-lg rounded-md bg-white">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-medium text-gray-900">
-                                {selectedProject ? 'Edit Project' : 'Create New Project'}
-                            </h3>
-                            <button 
-                                onClick={() => setShowModal(false)}
-                                className="text-gray-400 hover:text-gray-500"
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Project Title</label>
-                                <input
-                                    type="text"
-                                    name="title"
-                                    value={projectForm.title}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Description</label>
-                                <textarea
-                                    name="description"
-                                    value={projectForm.description}
-                                    onChange={handleInputChange}
-                                    rows="3"
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    required
-                                ></textarea>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Start Date</label>
-                                <input
-                                    type="date"
-                                    name="startDate"
-                                    value={projectForm.startDate}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">End Date</label>
-                                <input
-                                    type="date"
-                                    name="endDate"
-                                    value={projectForm.endDate}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    required
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Priority</label>
-                                <select
-                                    name="priority"
-                                    value={projectForm.priority}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Tags (comma-separated)</label>
-                                <input
-                                    type="text"
-                                    name="tags"
-                                    value={projectForm.tags.join(', ')}
-                                    onChange={handleInputChange}
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                                    placeholder="development, web, etc."
-                                />
-                            </div>
-                            <div className="flex justify-end space-x-3 mt-5">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md"
-                                >
-                                    {selectedProject ? 'Update Project' : 'Create Project'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Add Member Modal */}
+            {projectModal}
             {showMemberModal && (
                 <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
                     <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
@@ -547,6 +932,19 @@ const Projects = () => {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {categoryModal}
+            {labelManagerModal}
+
+            {showTaskDetail && selectedTask && (
+                <TaskDetailView
+                    task={selectedTask}
+                    onClose={() => {
+                        setShowTaskDetail(false);
+                        setSelectedTask(null);
+                    }}
+                />
             )}
         </div>
     );

@@ -28,24 +28,15 @@ const Users = () => {
         try {
             setLoading(true);
             const response = await userService.getProfile();
-            const role = response.data.role;
-            
-            if (role !== 'admin' && role !== 'manager') {
-                setError('Access denied. Only administrators and managers can view this page.');
-                setTimeout(() => {
-                    window.location.href = '/dashboard';
-                }, 2000);
-                return;
-            }
+            const role = response.role;
             
             setUserRole(role);
-            fetchUsers();
+            await fetchUsers();
+            setLoading(false);
         } catch (err) {
             console.error('Error checking user access:', err);
             setError('Failed to verify user permissions');
-            setTimeout(() => {
-                window.location.href = '/dashboard';
-            }, 2000);
+            setLoading(false);
         }
     };
 
@@ -173,17 +164,19 @@ const Users = () => {
     return (
         <div className="p-6">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-2xl font-bold text-gray-800">Users Management</h1>
-                <button
-                    onClick={() => {
-                        setSelectedUser(null);
-                        setShowModal(true);
-                    }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                    <FontAwesomeIcon icon={faUserPlus} className="mr-2" />
-                    Add User
-                </button>
+                <h1 className="text-2xl font-bold text-gray-800">Team Members</h1>
+                {(userRole === 'admin' || userRole === 'manager') && (
+                    <button
+                        onClick={() => {
+                            setSelectedUser(null);
+                            setShowModal(true);
+                        }}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                    >
+                        <FontAwesomeIcon icon={faUserPlus} className="mr-2" />
+                        Add Member
+                    </button>
+                )}
             </div>
 
             {error && (
@@ -206,11 +199,13 @@ const Users = () => {
                                     Email
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Username
+                                    Role
                                 </th>
-                                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Actions
-                                </th>
+                                {(userRole === 'admin' || userRole === 'manager') && (
+                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Actions
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -223,31 +218,33 @@ const Users = () => {
                                         {user.email}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
-                                        {user.username}
+                                        {user.role}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                        <button
-                                            onClick={() => {
-                                                setSelectedUser(user);
-                                                setFormData({
-                                                    ...formData,
-                                                    name: user.name,
-                                                    lastName: user.lastName,
-                                                    email: user.email
-                                                });
-                                                setShowModal(true);
-                                            }}
-                                            className="text-blue-600 hover:text-blue-900 mr-4"
-                                        >
-                                            <FontAwesomeIcon icon={faEdit} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(user._id)}
-                                            className="text-red-600 hover:text-red-900"
-                                        >
-                                            <FontAwesomeIcon icon={faTrash} />
-                                        </button>
-                                    </td>
+                                    {(userRole === 'admin' || userRole === 'manager') && (
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedUser(user);
+                                                    setFormData({
+                                                        ...formData,
+                                                        name: user.name,
+                                                        lastName: user.lastName,
+                                                        email: user.email
+                                                    });
+                                                    setShowModal(true);
+                                                }}
+                                                className="text-blue-600 hover:text-blue-900 mr-4"
+                                            >
+                                                <FontAwesomeIcon icon={faEdit} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(user._id)}
+                                                className="text-red-600 hover:text-red-900"
+                                            >
+                                                <FontAwesomeIcon icon={faTrash} />
+                                            </button>
+                                        </td>
+                                    )}
                                 </tr>
                             ))}
                         </tbody>
