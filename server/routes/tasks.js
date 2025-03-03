@@ -9,7 +9,8 @@ import {
     addTaskComment,
     getTaskStats,
     getTasksByProjectId,
-    getMyTasks
+    getMyTasks,
+    markTaskComplete
 } from "../controllers/taskController.js";
 
 const router = express.Router();
@@ -22,14 +23,15 @@ router.post("/", createTask);
 router.get("/", getAllTasks);
 router.get("/stats", getTaskStats);
 router.get("/my-tasks", getMyTasks);
+router.get("/project/:projectId", getTasksByProjectId);
 router.get("/:id", getTaskById);
 router.put("/:id", updateTask);
 router.delete("/:id", deleteTask);
 
+// Task completion
+router.put("/:id/complete", markTaskComplete);
+
 // Task comments
 router.post("/:id/comments", addTaskComment);
-
-// Add new route for getting tasks by project ID
-router.get("/project/:projectId", getTasksByProjectId);
 
 export default router;

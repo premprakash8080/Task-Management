@@ -13,11 +13,20 @@ const router = express.Router();
 
 router.use(auth);
 
+// Message routes
 router.post("/", sendMessage);
 router.get("/chats", getRecentChats);
 router.get("/unread/count", getUnreadCount);
-router.get("/:userId", getChatMessages);
-router.put("/:userId/read", markMessagesAsRead);
+
+// Direct message routes
+router.get("/user/:userId", getChatMessages);
+router.put("/user/:userId/read", markMessagesAsRead);
+
+// Project/Team chat routes
+router.get("/project/:projectId", getChatMessages);
+router.put("/project/:projectId/read", markMessagesAsRead);
+
+// Common routes
 router.delete("/:id", deleteMessage);
 
 export default router; 

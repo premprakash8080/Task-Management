@@ -14,19 +14,32 @@ const createProject = asyncHandler(async (req, res) => {
     }
 
     const project = await Project.create({
-        projectId: Math.random().toString(36).substr(2, 9), // Generate a unique project ID
+        projectId: Math.random().toString(36).substr(2, 9),
         title,
         description,
-        startDate,
-        endDate,
+        startDate: moment(startDate).toDate(),
+        endDate: endDate ? moment(endDate).toDate() : null,
         priority,
         tags,
         createdBy: req.user._id,
         members: [{ user: req.user._id, role: "leader" }]
     });
 
+    // Format dates for response
+    const formattedProject = {
+        ...project._doc,
+        createdAt: moment(project.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+        updatedAt: moment(project.updatedAt).format('YYYY-MM-DD HH:mm:ss'),
+        startDate: moment(project.startDate).format('YYYY-MM-DD'),
+        endDate: project.endDate ? moment(project.endDate).format('YYYY-MM-DD') : null,
+        members: project.members.map(member => ({
+            ...member._doc,
+            joinedAt: moment(member.joinedAt).format('YYYY-MM-DD HH:mm:ss')
+        }))
+    };
+
     res.status(201).json(
-        new ApiResponse(201, project, "Project created successfully")
+        new ApiResponse(201, formattedProject, "Project created successfully")
     );
 });
 
@@ -172,8 +185,21 @@ const getProjectById = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Not authorized to access this project");
     }
 
+    // Format dates for response
+    const formattedProject = {
+        ...project._doc,
+        createdAt: moment(project.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+        updatedAt: moment(project.updatedAt).format('YYYY-MM-DD HH:mm:ss'),
+        startDate: moment(project.startDate).format('YYYY-MM-DD'),
+        endDate: project.endDate ? moment(project.endDate).format('YYYY-MM-DD') : null,
+        members: project.members.map(member => ({
+            ...member._doc,
+            joinedAt: moment(member.joinedAt).format('YYYY-MM-DD HH:mm:ss')
+        }))
+    };
+
     res.status(200).json(
-        new ApiResponse(200, project, "Project retrieved successfully")
+        new ApiResponse(200, formattedProject, "Project retrieved successfully")
     );
 });
 

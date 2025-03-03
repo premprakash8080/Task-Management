@@ -3,6 +3,7 @@ import Notification from "../models/Notification.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import moment from 'moment';
 
 // Create Notification (Internal use)
 export const createNotification = async (data) => {
@@ -35,11 +36,19 @@ const getNotifications = asyncHandler(async (req, res) => {
         .skip((page - 1) * limit)
         .limit(limit);
 
+    // Format dates for notifications
+    const formattedNotifications = notifications.map(notification => ({
+        ...notification._doc,
+        createdAt: moment(notification.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+        updatedAt: moment(notification.updatedAt).format('YYYY-MM-DD HH:mm:ss'),
+        readAt: notification.readAt ? moment(notification.readAt).format('YYYY-MM-DD HH:mm:ss') : null
+    }));
+
     const total = await Notification.countDocuments(query);
 
     res.status(200).json(
         new ApiResponse(200, {
-            notifications,
+            notifications: formattedNotifications,
             pagination: {
                 total,
                 page: parseInt(page),
