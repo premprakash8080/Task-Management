@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { projectService } from '../../api';
+import { projectService } from '../api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faUsers, 

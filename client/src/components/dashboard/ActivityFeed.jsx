@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { taskService } from '../../api';
+import { taskService } from '../api';
 import moment from 'moment';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 

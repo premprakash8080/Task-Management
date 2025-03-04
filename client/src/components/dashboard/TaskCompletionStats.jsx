@@ -19,14 +19,18 @@ ChartJS.register(
     Legend
 );
 
-const TaskCompletionStats = ({ tasks }) => {
-    const tasksByStatus = tasks.reduce((acc, task) => {
-        acc[task.status] = (acc[task.status] || 0) + 1;
+const TaskCompletionStats = ({ tasks = [] }) => {
+    // Ensure tasks is an array
+    const tasksArray = Array.isArray(tasks) ? tasks : [];
+
+    const tasksByStatus = tasksArray.reduce((acc, task) => {
+        const status = task?.status?.toLowerCase() || 'unknown';
+        acc[status] = (acc[status] || 0) + 1;
         return acc;
     }, {});
 
-    const completedTasks = tasks.filter(task => task.status === 'completed').length;
-    const completionPercentage = Math.round((completedTasks / tasks.length) * 100) || 0;
+    const completedTasks = tasksArray.filter(task => task?.status?.toLowerCase() === 'completed').length;
+    const completionPercentage = tasksArray.length ? Math.round((completedTasks / tasksArray.length) * 100) : 0;
 
     const chartData = {
         labels: ['Backlog', 'To Do', 'In Progress', 'In Review', 'Completed'],
