@@ -1,5 +1,6 @@
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { ApiResponse } from '../utils/ApiResponse.js';
+import { ApiError } from '../utils/ApiError.js';
 import Task from '../models/Task.js';
 import Project from '../models/Project.js';
 import User from '../models/User.js';
@@ -18,13 +19,24 @@ const getAnalyticsOverview = asyncHandler(async (req, res) => {
                 $or: [
                     { 'assignees.user': userId },
                     { createdBy: userId }
-                ]
+                ],
+                createdAt: { $gte: startOfMonth.toDate() }
             }
         },
         {
             $group: {
-                _id: '$status',
-                count: { $sum: 1 }
+                _id: null,
+                total: { $sum: 1 },
+                completed: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', 'COMPLETED'] }, 1, 0]
+                    }
+                },
+                inProgress: {
+                    $sum: {
+                        $cond: [{ $eq: ['$status', 'IN_PROGRESS'] }, 1, 0]
+                    }
+                }
             }
         }
     ]);
@@ -34,36 +46,37 @@ const getAnalyticsOverview = asyncHandler(async (req, res) => {
         {
             $match: {
                 $or: [
-                    { 'members.user': userId },
+                    { members: userId },
                     { createdBy: userId }
                 ]
             }
         },
         {
             $group: {
-                _id: '$status',
-                count: { $sum: 1 }
+                _id: null,
+                total: { $sum: 1 },
+                active: {
+                    $sum: {
+                        $cond: [
+                            {
+                                $and: [
+                                    { $lt: ['$startDate', today.toDate()] },
+                                    { $gt: ['$endDate', today.toDate()] }
+                                ]
+                            },
+                            1,
+                            0
+                        ]
+                    }
+                }
             }
         }
     ]);
 
-    // Get recent activity
-    const recentActivity = await Task.find({
-        $or: [
-            { 'assignees.user': userId },
-            { createdBy: userId }
-        ],
-        updatedAt: { $gte: startOfMonth.toDate() }
-    })
-    .sort('-updatedAt')
-    .limit(10)
-    .populate('project', 'title');
-
     res.status(200).json(
         new ApiResponse(200, {
-            taskStats,
-            projectStats,
-            recentActivity
+            tasks: taskStats[0] || { total: 0, completed: 0, inProgress: 0 },
+            projects: projectStats[0] || { total: 0, active: 0 }
         }, "Analytics overview retrieved successfully")
     );
 });
@@ -72,10 +85,15 @@ const getAnalyticsOverview = asyncHandler(async (req, res) => {
 const getTaskAnalytics = asyncHandler(async (req, res) => {
     const userId = req.user._id;
     const { startDate, endDate } = req.query;
-    const start = startDate ? moment(startDate).startOf('day') : moment().subtract(30, 'days').startOf('day');
-    const end = endDate ? moment(endDate).endOf('day') : moment().endOf('day');
 
-    // Get task completion trends
+    if (!startDate || !endDate) {
+        throw new ApiError(400, "Start date and end date are required");
+    }
+
+    const start = moment(startDate).startOf('day');
+    const end = moment(endDate).endOf('day');
+
+    // Get task trends
     const taskTrends = await Task.aggregate([
         {
             $match: {
@@ -92,25 +110,27 @@ const getTaskAnalytics = asyncHandler(async (req, res) => {
         {
             $group: {
                 _id: {
-                    date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-                    status: "$status"
+                    date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                    status: '$status'
                 },
                 count: { $sum: 1 }
             }
         },
-        {
-            $sort: { "_id.date": 1 }
-        }
+        { $sort: { '_id.date': 1 } }
     ]);
 
-    // Get task distribution by priority
+    // Get priority distribution
     const priorityDistribution = await Task.aggregate([
         {
             $match: {
                 $or: [
                     { 'assignees.user': userId },
                     { createdBy: userId }
-                ]
+                ],
+                createdAt: {
+                    $gte: start.toDate(),
+                    $lte: end.toDate()
+                }
             }
         },
         {
@@ -133,12 +153,11 @@ const getTaskAnalytics = asyncHandler(async (req, res) => {
 const getProjectAnalytics = asyncHandler(async (req, res) => {
     const userId = req.user._id;
 
-    // Get project progress statistics
     const projectProgress = await Project.aggregate([
         {
             $match: {
                 $or: [
-                    { 'members.user': userId },
+                    { members: userId },
                     { createdBy: userId }
                 ]
             }
@@ -154,7 +173,6 @@ const getProjectAnalytics = asyncHandler(async (req, res) => {
         {
             $project: {
                 title: 1,
-                status: 1,
                 totalTasks: { $size: '$tasks' },
                 completedTasks: {
                     $size: {
@@ -179,14 +197,17 @@ const getProjectAnalytics = asyncHandler(async (req, res) => {
 // Get User Engagement
 const getUserEngagement = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    const startOfMonth = moment().startOf('month');
+    const thirtyDaysAgo = moment().subtract(30, 'days').startOf('day');
 
     // Get task completion rate
     const taskCompletionRate = await Task.aggregate([
         {
             $match: {
-                'assignees.user': userId,
-                createdAt: { $gte: startOfMonth.toDate() }
+                $or: [
+                    { 'assignees.user': userId },
+                    { createdBy: userId }
+                ],
+                createdAt: { $gte: thirtyDaysAgo.toDate() }
             }
         },
         {
@@ -202,48 +223,32 @@ const getUserEngagement = asyncHandler(async (req, res) => {
         }
     ]);
 
-    // Get contribution to projects
-    const projectContributions = await Project.aggregate([
+    // Get daily activity
+    const dailyActivity = await Task.aggregate([
         {
             $match: {
-                'members.user': userId
+                $or: [
+                    { 'assignees.user': userId },
+                    { createdBy: userId }
+                ],
+                updatedAt: { $gte: thirtyDaysAgo.toDate() }
             }
         },
         {
-            $lookup: {
-                from: 'tasks',
-                localField: '_id',
-                foreignField: 'project',
-                as: 'tasks'
+            $group: {
+                _id: {
+                    date: { $dateToString: { format: '%Y-%m-%d', date: '$updatedAt' } }
+                },
+                count: { $sum: 1 }
             }
         },
-        {
-            $project: {
-                title: 1,
-                contributionCount: {
-                    $size: {
-                        $filter: {
-                            input: '$tasks',
-                            as: 'task',
-                            cond: {
-                                $or: [
-                                    { $eq: ['$$task.createdBy', userId] },
-                                    {
-                                        $in: [userId, '$$task.assignees.user']
-                                    }
-                                ]
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        { $sort: { '_id.date': 1 } }
     ]);
 
     res.status(200).json(
         new ApiResponse(200, {
             taskCompletionRate: taskCompletionRate[0] || { total: 0, completed: 0 },
-            projectContributions
+            dailyActivity
         }, "User engagement metrics retrieved successfully")
     );
 });
@@ -251,15 +256,18 @@ const getUserEngagement = asyncHandler(async (req, res) => {
 // Get Custom Analytics
 const getCustomAnalytics = asyncHandler(async (req, res) => {
     const userId = req.user._id;
-    const { startDate, endDate, metrics = [] } = req.query;
+    const { startDate, endDate, metrics } = req.query;
+
+    if (!startDate || !endDate || !metrics) {
+        throw new ApiError(400, "Start date, end date, and metrics are required");
+    }
+
     const start = moment(startDate).startOf('day');
     const end = moment(endDate).endOf('day');
+    const result = {};
 
-    const analyticsData = {};
-
-    // Process requested metrics
-    if (metrics.includes('taskProgress')) {
-        analyticsData.taskProgress = await Task.aggregate([
+    if (metrics.includes('taskDistribution')) {
+        result.taskDistribution = await Task.aggregate([
             {
                 $match: {
                     $or: [
@@ -274,24 +282,23 @@ const getCustomAnalytics = asyncHandler(async (req, res) => {
             },
             {
                 $group: {
-                    _id: {
-                        date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
-                        status: "$status"
-                    },
+                    _id: '$status',
                     count: { $sum: 1 }
                 }
             }
         ]);
     }
 
-    if (metrics.includes('projectHealth')) {
-        analyticsData.projectHealth = await Project.aggregate([
+    if (metrics.includes('projectProgress')) {
+        result.projectProgress = await Project.aggregate([
             {
                 $match: {
                     $or: [
-                        { 'members.user': userId },
+                        { members: userId },
                         { createdBy: userId }
-                    ]
+                    ],
+                    startDate: { $lte: end.toDate() },
+                    endDate: { $gte: start.toDate() }
                 }
             },
             {
@@ -305,62 +312,24 @@ const getCustomAnalytics = asyncHandler(async (req, res) => {
             {
                 $project: {
                     title: 1,
-                    health: {
-                        $cond: {
-                            if: { $eq: [{ $size: '$tasks' }, 0] },
-                            then: 'NO_TASKS',
-                            else: {
-                                $switch: {
-                                    branches: [
-                                        {
-                                            case: {
-                                                $gte: [
-                                                    {
-                                                        $divide: [
-                                                            {
-                                                                $size: {
-                                                                    $filter: {
-                                                                        input: '$tasks',
-                                                                        as: 'task',
-                                                                        cond: { $eq: ['$$task.status', 'COMPLETED'] }
-                                                                    }
-                                                                }
-                                                            },
-                                                            { $size: '$tasks' }
-                                                        ]
-                                                    },
-                                                    0.7
-                                                ]
-                                            },
-                                            then: 'HEALTHY'
-                                        },
-                                        {
-                                            case: {
-                                                $gte: [
-                                                    {
-                                                        $divide: [
-                                                            {
-                                                                $size: {
-                                                                    $filter: {
-                                                                        input: '$tasks',
-                                                                        as: 'task',
-                                                                        cond: { $eq: ['$$task.status', 'COMPLETED'] }
-                                                                    }
-                                                                }
-                                                            },
-                                                            { $size: '$tasks' }
-                                                        ]
-                                                    },
-                                                    0.3
-                                                ]
-                                            },
-                                            then: 'AT_RISK'
+                    progress: {
+                        $multiply: [
+                            {
+                                $divide: [
+                                    {
+                                        $size: {
+                                            $filter: {
+                                                input: '$tasks',
+                                                as: 'task',
+                                                cond: { $eq: ['$$task.status', 'COMPLETED'] }
+                                            }
                                         }
-                                    ],
-                                    default: 'CRITICAL'
-                                }
-                            }
-                        }
+                                    },
+                                    { $size: '$tasks' }
+                                ]
+                            },
+                            100
+                        ]
                     }
                 }
             }
@@ -368,7 +337,7 @@ const getCustomAnalytics = asyncHandler(async (req, res) => {
     }
 
     res.status(200).json(
-        new ApiResponse(200, analyticsData, "Custom analytics retrieved successfully")
+        new ApiResponse(200, result, "Custom analytics retrieved successfully")
     );
 });
 
