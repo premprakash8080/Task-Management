@@ -728,4 +728,114 @@ export const notificationService = {
     }
 };
 
+export const calendarService = {
+    // Get calendar overview
+    getCalendarOverview: async () => {
+        try {
+            const response = await api.get('/calendar');
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get calendar events
+    getCalendarEvents: async (startDate, endDate, view = 'month') => {
+        try {
+            const response = await api.get('/calendar/events', {
+                params: { startDate, endDate, view }
+            });
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Create calendar event
+    createCalendarEvent: async (eventData) => {
+        try {
+            const response = await api.post('/calendar/event', eventData);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Update calendar event
+    updateCalendarEvent: async (eventId, eventData) => {
+        try {
+            const response = await api.put(`/calendar/event/${eventId}`, eventData);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Delete calendar event
+    deleteCalendarEvent: async (eventId) => {
+        try {
+            const response = await api.delete(`/calendar/event/${eventId}`);
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    }
+};
+
+export const analyticsService = {
+    // Get analytics overview
+    getAnalyticsOverview: async () => {
+        try {
+            const response = await api.get('/analytics');
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get task analytics
+    getTaskAnalytics: async (startDate, endDate) => {
+        try {
+            const response = await api.get('/analytics/tasks', {
+                params: { startDate, endDate }
+            });
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get project analytics
+    getProjectAnalytics: async () => {
+        try {
+            const response = await api.get('/analytics/projects');
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get user engagement metrics
+    getUserEngagement: async () => {
+        try {
+            const response = await api.get('/analytics/user-engagement');
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get custom analytics
+    getCustomAnalytics: async (startDate, endDate, metrics = []) => {
+        try {
+            const response = await api.get('/analytics/custom', {
+                params: { startDate, endDate, metrics }
+            });
+            return response.data.data;
+        } catch (error) {
+            throw error.response?.data?.message || error.message;
+        }
+    }
+};
+
 export default api;
