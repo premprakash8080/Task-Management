@@ -1,4 +1,13 @@
 import express from "express";
+import userRoutes from './users.js';
+import taskRoutes from './tasks.js';
+import projectRoutes from './project.js';
+import messageRoutes from './messages.js';
+import notificationRoutes from './notifications.js';
+import categoryRoutes from './categories.js';
+import labelRoutes from './labels.js';
+import calendarRoutes from './calendar.js';
+import analyticsRoutes from './analytics.js';
 
 const router = express.Router();
 
@@ -11,5 +20,15 @@ router.get("/", (req, res) => {
     author: "@mreorhan",
   });
 });
+
+router.use('/users', userRoutes);
+router.use('/tasks', taskRoutes);
+router.use('/projects', projectRoutes);
+router.use('/messages', messageRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/categories', categoryRoutes);
+router.use('/labels', labelRoutes);
+router.use('/calendar', calendarRoutes);
+router.use('/analytics', analyticsRoutes);
 
 export default router;
