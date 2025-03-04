@@ -15,16 +15,17 @@ import {
 import TaskCompletionStats from '../../components/dashboard/TaskCompletionStats';
 import ActivityFeed from '../../components/dashboard/ActivityFeed';
 import ProjectOverview from '../../components/dashboard/ProjectOverview';
-import { analyticsService, taskService, projectService } from '../../components/api';
+import { dashboardService } from '../../components/api';
 import moment from 'moment';
 import { toast } from 'react-toastify';
 
 const Dashboard = () => {
     const location = useLocation();
-    const [analyticsData, setAnalyticsData] = useState({
+    const [dashboardData, setDashboardData] = useState({
         taskStats: null,
-        projectStats: null,
-        userEngagement: null
+        priorityDistribution: null,
+        upcomingDeadlines: [],
+        teamPerformance: []
     });
     const [loading, setLoading] = useState(true);
 
@@ -35,19 +36,17 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const [analytics, projectStats, userEngagement] = await Promise.all([
-                analyticsService.getAnalyticsOverview(),
-                analyticsService.getProjectAnalytics(),
-                analyticsService.getUserEngagement()
-            ]);
-
-            setAnalyticsData({
-                taskStats: analytics,
-                projectStats: projectStats,
-                userEngagement: userEngagement
+            const overview = await dashboardService.getDashboardOverview();
+            
+            setDashboardData({
+                taskStats: overview.taskStats,
+                priorityDistribution: overview.priorityDistribution,
+                upcomingDeadlines: overview.upcomingDeadlines,
+                teamPerformance: overview.teamPerformance
             });
         } catch (error) {
             toast.error('Failed to fetch dashboard data');
+            console.error('Dashboard data fetch error:', error);
         } finally {
             setLoading(false);
         }
@@ -69,7 +68,7 @@ const Dashboard = () => {
                         <div className="flex-1">
                             <p className="text-sm text-gray-500 mb-1">Backlog</p>
                             <h3 className="text-xl font-bold text-gray-800">
-                                {analyticsData.taskStats?.backlogTasks || 0}
+                                {dashboardData.taskStats?.backlogTasks || 0}
                             </h3>
                         </div>
                         <FontAwesomeIcon icon={faFlag} className="text-2xl text-yellow-400" />
@@ -80,7 +79,7 @@ const Dashboard = () => {
                         <div className="flex-1">
                             <p className="text-sm text-gray-500 mb-1">In Progress</p>
                             <h3 className="text-xl font-bold text-gray-800">
-                                {analyticsData.taskStats?.inProgressTasks || 0}
+                                {dashboardData.taskStats?.inProgressTasks || 0}
                             </h3>
                         </div>
                         <FontAwesomeIcon icon={faSpinner} className="text-2xl text-blue-400" />
@@ -91,7 +90,7 @@ const Dashboard = () => {
                         <div className="flex-1">
                             <p className="text-sm text-gray-500 mb-1">Under Review</p>
                             <h3 className="text-xl font-bold text-gray-800">
-                                {analyticsData.taskStats?.inReviewTasks || 0}
+                                {dashboardData.taskStats?.inReviewTasks || 0}
                             </h3>
                         </div>
                         <FontAwesomeIcon icon={faClock} className="text-2xl text-indigo-400" />
@@ -102,7 +101,7 @@ const Dashboard = () => {
                         <div className="flex-1">
                             <p className="text-sm text-gray-500 mb-1">Completed</p>
                             <h3 className="text-xl font-bold text-gray-800">
-                                {analyticsData.taskStats?.completedTasks || 0}
+                                {dashboardData.taskStats?.completedTasks || 0}
                             </h3>
                         </div>
                         <FontAwesomeIcon icon={faCheckCircle} className="text-2xl text-green-400" />
@@ -119,7 +118,7 @@ const Dashboard = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                         <div className="bg-white rounded-lg shadow p-6">
                             <h2 className="text-xl font-semibold mb-4">Task Completion</h2>
-                            <TaskCompletionStats tasks={analyticsData.taskStats?.allTasks || []} />
+                            <TaskCompletionStats tasks={dashboardData.taskStats} />
                         </div>
 
                         <div className="bg-white rounded-lg shadow p-6">
@@ -157,7 +156,7 @@ const Dashboard = () => {
                                         }`}></div>
                                         <span className="flex-1">{priority}</span>
                                         <span className="font-semibold">
-                                            {analyticsData.taskStats?.priorityDistribution?.[priority] || 0}
+                                            {dashboardData.priorityDistribution?.[priority] || 0}
                                         </span>
                                     </div>
                                 ))}
@@ -167,7 +166,7 @@ const Dashboard = () => {
                         <div className="bg-white rounded-lg shadow p-6">
                             <h2 className="text-xl font-semibold mb-4">Upcoming Deadlines</h2>
                             <div className="space-y-3">
-                                {analyticsData.taskStats?.upcomingDeadlines?.map(task => (
+                                {dashboardData.upcomingDeadlines?.map(task => (
                                     <div key={task._id} className="flex items-center">
                                         <FontAwesomeIcon icon={faCalendarAlt} className="text-gray-400 mr-2" />
                                         <div className="flex-1">
@@ -184,10 +183,10 @@ const Dashboard = () => {
                         <div className="bg-white rounded-lg shadow p-6">
                             <h2 className="text-xl font-semibold mb-4">Team Performance</h2>
                             <div className="space-y-4">
-                                {analyticsData.userEngagement?.teamPerformance?.map(member => (
+                                {dashboardData.teamPerformance?.map(member => (
                                     <div key={member.userId} className="flex items-center">
                                         <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                                            {member.name.charAt(0)}
+                                            {member.name?.charAt(0)}
                                         </div>
                                         <div className="ml-3 flex-1">
                                             <p className="text-sm font-medium">{member.name}</p>
@@ -199,7 +198,7 @@ const Dashboard = () => {
                                             </div>
                                         </div>
                                         <span className="ml-2 text-sm font-medium">
-                                            {member.completionRate}%
+                                            {Math.round(member.completionRate)}%
                                         </span>
                                     </div>
                                 ))}

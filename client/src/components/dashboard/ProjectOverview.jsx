@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { projectService } from '../api';
+import { dashboardService } from '../api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faUsers, 
@@ -19,8 +19,8 @@ const ProjectOverview = () => {
 
     const fetchProjects = async () => {
         try {
-            const data = await projectService.getAllProjects();
-            setProjects(data);
+            const projectsData = await dashboardService.getProjectOverview();
+            setProjects(projectsData);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching projects:', error);
@@ -29,12 +29,12 @@ const ProjectOverview = () => {
     };
 
     const getProjectStatus = (project) => {
-        const completedTasks = project.tasks?.filter(t => t.status === 'done').length || 0;
-        const totalTasks = project.tasks?.length || 0;
-        
-        if (totalTasks === 0) return { icon: faClock, color: 'text-yellow-500', text: 'No Tasks' };
-        
-        const completionRate = (completedTasks / totalTasks) * 100;
+        const { taskStats } = project;
+        if (!taskStats || taskStats.total === 0) {
+            return { icon: faClock, color: 'text-yellow-500', text: 'No Tasks' };
+        }
+
+        const completionRate = (taskStats.completed / taskStats.total) * 100;
         
         if (completionRate === 100) {
             return { icon: faCheckCircle, color: 'text-green-500', text: 'Completed' };
@@ -59,9 +59,9 @@ const ProjectOverview = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map(project => {
                 const status = getProjectStatus(project);
-                const completedTasks = project.tasks?.filter(t => t.status === 'done').length || 0;
-                const totalTasks = project.tasks?.length || 0;
-                const completionPercentage = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                const completionPercentage = project.taskStats?.total > 0 
+                    ? Math.round((project.taskStats.completed / project.taskStats.total) * 100) 
+                    : 0;
 
                 return (
                     <Link 
@@ -85,7 +85,7 @@ const ProjectOverview = () => {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                                 <div 
-                                    className="bg-blue-600 h-2 rounded-full"
+                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                                     style={{ width: `${completionPercentage}%` }}
                                 ></div>
                             </div>
@@ -97,31 +97,40 @@ const ProjectOverview = () => {
                                 <span>{project.members?.length || 0} Members</span>
                             </div>
                             <div className="text-sm text-gray-600">
-                                {completedTasks}/{totalTasks} Tasks
+                                {project.taskStats?.total > 0 
+                                    ? `${project.taskStats.completed}/${project.taskStats.total} Tasks` 
+                                    : 'No Tasks'}
                             </div>
                         </div>
 
                         {project.members && project.members.length > 0 && (
                             <div className="mt-4 flex -space-x-2">
-                                {project.members.slice(0, 5).map(member => (
-                                    <div 
-                                        key={member.user._id}
-                                        className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center"
-                                        title={member.user.name}
-                                    >
-                                        {member.user.avatar ? (
-                                            <img 
-                                                src={member.user.avatar}
-                                                alt={member.user.name}
-                                                className="w-full h-full rounded-full"
-                                            />
-                                        ) : (
-                                            <span className="text-sm font-medium">
-                                                {member.user.name.charAt(0)}
-                                            </span>
-                                        )}
-                                    </div>
-                                ))}
+                                {project.members.slice(0, 5).map(member => {
+                                    if (!member || !member._id) return null;
+
+                                    const memberName = member.name || 'Unknown';
+                                    const memberInitial = memberName.charAt(0) || '?';
+
+                                    return (
+                                        <div 
+                                            key={member._id}
+                                            className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center"
+                                            title={memberName}
+                                        >
+                                            {member.avatar ? (
+                                                <img 
+                                                    src={member.avatar}
+                                                    alt={memberName}
+                                                    className="w-full h-full rounded-full"
+                                                />
+                                            ) : (
+                                                <span className="text-sm font-medium">
+                                                    {memberInitial}
+                                                </span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                                 {project.members.length > 5 && (
                                     <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center">
                                         <span className="text-sm text-gray-600">
