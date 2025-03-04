@@ -224,6 +224,17 @@ export const projectService = {
         } catch (error) {
             throw error.response?.data?.message || error.message;
         }
+    },
+
+    // Get accessible project names
+    getAccessibleProjectNames: async () => {
+        try {
+            const response = await api.get('/projects/names');
+            return response.data.data || [];
+        } catch (error) {
+            console.error('Error fetching project names:', error);
+            return [];
+        }
     }
 };
 
@@ -231,14 +242,21 @@ export const taskService = {
     // Create task
     createTask: async (taskData) => {
         try {
-            // Format dates before sending
+            // Validate and format subtasks
+            const formattedSubtasks = taskData.subtasks?.map(subtask => ({
+                title: subtask.title || '',  // Ensure title is never undefined
+                description: subtask.description || '',
+                status: subtask.status || 'TODO',
+                dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null,
+                assignedTo: subtask.assignedTo || null,
+                estimatedTime: subtask.estimatedTime || 0
+            })).filter(subtask => subtask.title.trim() !== ''); // Remove subtasks with empty titles
+
+            // Format dates and handle empty assignees before sending
             const formattedData = {
                 ...taskData,
                 dueDate: taskData.dueDate ? moment(taskData.dueDate).format('YYYY-MM-DD') : null,
-                subtasks: taskData.subtasks?.map(subtask => ({
-                    ...subtask,
-                    dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null
-                }))
+                subtasks: formattedSubtasks
             };
 
             const response = await api.post('/tasks', formattedData);
@@ -261,14 +279,21 @@ export const taskService = {
     // Update task
     updateTask: async (taskId, taskData) => {
         try {
-            // Format dates before sending
+            // Validate and format subtasks
+            const formattedSubtasks = taskData.subtasks?.map(subtask => ({
+                title: subtask.title || '',  // Ensure title is never undefined
+                description: subtask.description || '',
+                status: subtask.status || 'TODO',
+                dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null,
+                assignedTo: subtask.assignedTo || null,
+                estimatedTime: subtask.estimatedTime || 0
+            })).filter(subtask => subtask.title.trim() !== ''); // Remove subtasks with empty titles
+
+            // Format dates and handle empty assignees before sending
             const formattedData = {
                 ...taskData,
                 dueDate: taskData.dueDate ? moment(taskData.dueDate).format('YYYY-MM-DD') : null,
-                subtasks: taskData.subtasks?.map(subtask => ({
-                    ...subtask,
-                    dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null
-                }))
+                subtasks: formattedSubtasks
             };
 
             const response = await api.put(`/tasks/${taskId}`, formattedData);
@@ -396,6 +421,53 @@ export const taskService = {
             };
         } catch (error) {
             console.error('Error fetching my tasks:', error);
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Get accessible projects with tasks
+    getAccessibleProjectsWithTasks: async (filters = {}) => {
+        try {
+            const { status, priority, search, page = 1, limit = 10 } = filters;
+            
+            // Remove empty values
+            const formattedFilters = Object.entries({
+                status,
+                priority,
+                search,
+                page,
+                limit
+            }).reduce((acc, [key, value]) => {
+                if (value !== undefined && value !== null && value !== '') {
+                    acc[key] = value;
+                }
+                return acc;
+            }, {});
+            
+            const queryParams = new URLSearchParams(formattedFilters).toString();
+            const response = await api.get(`/tasks/projects-with-tasks${queryParams ? `?${queryParams}` : ''}`);
+            
+            if (response.data && response.data.data) {
+                return {
+                    projects: response.data.data.projects || [],
+                    pagination: response.data.data.pagination || {
+                        total: 0,
+                        page: 1,
+                        pages: 1
+                    }
+                };
+            }
+            
+            return {
+                projects: [],
+                pagination: {
+                    total: 0,
+                    page: 1,
+                    pages: 1
+                }
+            };
+        } catch (error) {
+            console.error('Error fetching accessible projects with tasks:', error);
             throw error.response?.data?.message || error.message;
         }
     }

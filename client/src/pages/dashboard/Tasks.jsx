@@ -57,14 +57,13 @@ const Tasks = () => {
     const [taskForm, setTaskForm] = useState({
         title: '',
         description: '',
-        project: projectId,
-        assignees: [],
+        project: projectId || '',
+        assignedTo: '',
         priority: 'medium',
         dueDate: '',
         estimatedTime: '',
+        actualTime: 0,
         status: 'todo',
-        category: '',
-        labels: [],
         subtasks: []
     });
 
@@ -257,9 +256,20 @@ const Tasks = () => {
         e.preventDefault();
         try {
             const formData = {
-                ...taskForm,
+                title: taskForm.title,
+                description: taskForm.description,
+                project: taskForm.project || projectId || null,
+                assignedTo: taskForm.assignedTo || null,
+                priority: taskForm.priority,
                 dueDate: taskForm.dueDate ? new Date(taskForm.dueDate).toISOString() : null,
-                project: taskForm.project || projectId
+                estimatedTime: parseInt(taskForm.estimatedTime) || 0,
+                actualTime: parseInt(taskForm.actualTime) || 0,
+                status: taskForm.status,
+                subtasks: taskForm.subtasks.map(subtask => ({
+                    title: subtask.title,
+                    status: subtask.status || 'todo',
+                    assignedTo: subtask.assignedTo || null
+                })).filter(subtask => subtask.title.trim() !== '')
             };
 
             if (selectedTask) {
@@ -272,14 +282,13 @@ const Tasks = () => {
             setTaskForm({
                 title: '',
                 description: '',
-                project: projectId,
-                assignees: [],
+                project: projectId || '',
+                assignedTo: '',
                 priority: 'medium',
                 dueDate: '',
                 estimatedTime: '',
+                actualTime: 0,
                 status: 'todo',
-                category: '',
-                labels: [],
                 subtasks: []
             });
             setSelectedTask(null);
@@ -345,17 +354,13 @@ const Tasks = () => {
         setTaskForm({
             title: task.title,
             description: task.description,
-            project: task.project?._id || projectId,
-            assignees: task.assignees?.map(a => ({
-                user: a.user._id || a.user,
-                role: a.role
-            })) || [],
+            project: task.project?._id || projectId || '',
+            assignedTo: task.assignedTo?._id || task.assignedTo || '',
             priority: task.priority || 'medium',
             dueDate: task.dueDate ? moment(task.dueDate).format('YYYY-MM-DDTHH:mm') : '',
             estimatedTime: task.estimatedTime || '',
+            actualTime: task.actualTime || 0,
             status: task.status || 'todo',
-            category: task.category || '',
-            labels: task.labels || [],
             subtasks: task.subtasks?.map(s => ({
                 title: s.title,
                 status: s.status || 'todo',
@@ -574,21 +579,37 @@ const Tasks = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700">Assignees</label>
-                                    <div className="mt-1 max-h-40 overflow-y-auto border rounded-md p-2">
+                                    <label className="block text-sm font-medium text-gray-700">Assigned To</label>
+                                    <select
+                                        name="assignedTo"
+                                        value={taskForm.assignedTo}
+                                        onChange={handleInputChange}
+                                        className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                    >
+                                        <option value="">Select Assignee</option>
                                         {users.map(user => (
-                                            <label key={user._id} className="flex items-center p-2 hover:bg-gray-50">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={taskForm.assignees.some(a => a.user === user._id)}
-                                                    onChange={(e) => handleAssigneeChange(user._id, e.target.checked)}
-                                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                                />
-                                                <span className="ml-2">{user.name}</span>
-                                            </label>
+                                            <option key={user._id} value={user._id}>
+                                                {user.name} ({user.email})
+                                            </option>
                                         ))}
-                                    </div>
+                                    </select>
                                 </div>
+                                {!projectId && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">Project</label>
+                                        <select
+                                            name="project"
+                                            value={taskForm.project}
+                                            onChange={handleInputChange}
+                                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        >
+                                            <option value="">Select Project</option>
+                                            {/* Add your projects list here */}
+                                        </select>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700">Priority</label>
                                     <select
@@ -659,7 +680,7 @@ const Tasks = () => {
                                             <option value="">Assign to</option>
                                             {users.map(user => (
                                                 <option key={user._id} value={user._id}>
-                                                    {user.name}
+                                                    {user.name} ({user.email})
                                                 </option>
                                             ))}
                                         </select>

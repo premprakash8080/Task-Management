@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
+import { Link, useLocation, Outlet, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { userService } from '../components/api';
 import { 
     faHome, 
     faUsers, 
@@ -13,141 +14,212 @@ import {
     faClipboardList,
     faComments,
     faFolderOpen,
-    faChevronDown
+    faChevronDown,
+    faListCheck,
+    faUserCog
 } from '@fortawesome/free-solid-svg-icons';
 import Header from '../components/common/header';
 
 const DashboardLayout = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const [tasksDropdownOpen, setTasksDropdownOpen] = useState(false);
 
+    const handleLogout = async () => {
+        try {
+            await userService.logout();
+            navigate('/login');
+        } catch (error) {
+            console.error('Logout failed:', error);
+            // Still clear local storage and redirect even if API call fails
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            navigate('/login');
+        }
+    };
+
     const renderSidebar = () => (
-        <div className="side">
-            <div className="logo">
-                <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-500 mr-2" />
-                Task Manager
+        <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg z-10 flex flex-col">
+            <div className="p-6 border-b border-gray-200">
+                <div className="flex items-center space-x-3">
+                    <FontAwesomeIcon icon={faProjectDiagram} className="text-blue-600 text-2xl" />
+                    <span className="text-xl font-semibold text-gray-800">Task Manager</span>
+                </div>
             </div>
             
-            <nav className="side-menu">
-                <div className="menu-section">
-                    <div className="menu-header">Main</div>
-                    <ul>
-                        <li>
-                            <Link to="/dashboard" className={location.pathname === '/dashboard' ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faHome} />
-                                <span className="menu-text">Dashboard</span>
-                            </Link>
-                        </li>
-                        <li className="relative">
-                            <div
-                                className={`flex items-center justify-between cursor-pointer p-2 hover:bg-gray-100 rounded ${
-                                    location.pathname.startsWith('/dashboard/tasks') ? 'active' : ''
+            <nav className="flex-1 overflow-y-auto px-4 py-6">
+                <div className="space-y-8">
+                    {/* Main Navigation */}
+                    <div>
+                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Main
+                        </h3>
+                        <div className="mt-3 space-y-1">
+                            <Link 
+                                to="/dashboard" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard' 
+                                    ? 'bg-blue-50 text-blue-600' 
+                                    : 'text-gray-700 hover:bg-gray-50'
                                 }`}
-                                onClick={() => setTasksDropdownOpen(!tasksDropdownOpen)}
                             >
-                                <div className="flex items-center">
-                                    <FontAwesomeIcon icon={faTasks} />
-                                    <span className="menu-text ml-2">Tasks</span>
-                                </div>
-                                <FontAwesomeIcon
-                                    icon={faChevronDown}
-                                    className={`transition-transform ${tasksDropdownOpen ? 'rotate-180' : ''}`}
-                                />
-                            </div>
-                            {tasksDropdownOpen && (
-                                <div className="absolute left-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5">
-                                    <div className="py-1" role="menu">
+                                <FontAwesomeIcon icon={faHome} className="mr-3 flex-shrink-0" />
+                                <span>Dashboard</span>
+                            </Link>
+
+                            {/* Tasks Dropdown */}
+                            <div className="relative">
+                                <button
+                                    onClick={() => setTasksDropdownOpen(!tasksDropdownOpen)}
+                                    className={`w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg ${
+                                        location.pathname.includes('/dashboard/tasks')
+                                        ? 'bg-blue-50 text-blue-600'
+                                        : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <div className="flex items-center">
+                                        <FontAwesomeIcon icon={faTasks} className="mr-3 flex-shrink-0" />
+                                        <span>Tasks</span>
+                                    </div>
+                                    <FontAwesomeIcon
+                                        icon={faChevronDown}
+                                        className={`transition-transform duration-200 ${tasksDropdownOpen ? 'rotate-180' : ''}`}
+                                    />
+                                </button>
+                                
+                                {tasksDropdownOpen && (
+                                    <div className="mt-1 ml-6 space-y-1">
                                         <Link
                                             to="/dashboard/tasks/my-tasks"
-                                            className={`block px-4 py-2 text-sm ${
+                                            className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
                                                 location.pathname === '/dashboard/tasks/my-tasks'
-                                                    ? 'bg-gray-100 text-gray-900'
-                                                    : 'text-gray-700'
-                                            } hover:bg-gray-100`}
-                                            role="menuitem"
+                                                ? 'bg-blue-50 text-blue-600'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                            }`}
                                         >
+                                            <FontAwesomeIcon icon={faUserCog} className="mr-3 flex-shrink-0" />
                                             My Tasks
                                         </Link>
                                         <Link
                                             to="/dashboard/tasks/all-tasks"
-                                            className={`block px-4 py-2 text-sm ${
+                                            className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
                                                 location.pathname === '/dashboard/tasks/all-tasks'
-                                                    ? 'bg-gray-100 text-gray-900'
-                                                    : 'text-gray-700'
-                                            } hover:bg-gray-100`}
-                                            role="menuitem"
+                                                ? 'bg-blue-50 text-blue-600'
+                                                : 'text-gray-600 hover:bg-gray-50'
+                                            }`}
                                         >
+                                            <FontAwesomeIcon icon={faListCheck} className="mr-3 flex-shrink-0" />
                                             All Tasks
                                         </Link>
                                     </div>
-                                </div>
-                            )}
-                        </li>
-                        <li>
-                            <Link to="/dashboard/calendar" className={location.pathname === '/dashboard/calendar' ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faCalendarAlt} />
-                                <span className="menu-text">Calendar</span>
-                            </Link>
-                        </li>
-                    </ul>
-                </div>
+                                )}
+                            </div>
 
-                <div className="menu-section">
-                    <div className="menu-header">Projects</div>
-                    <ul>
-                        <li>
-                            <Link to="/dashboard/projects" className={location.pathname === '/dashboard/projects' ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faFolderOpen} />
-                                <span className="menu-text">All Projects</span>
+                            <Link 
+                                to="/dashboard/calendar" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/calendar'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faCalendarAlt} className="mr-3 flex-shrink-0" />
+                                <span>Calendar</span>
                             </Link>
-                        </li>
-                        {/* <li>
-                            <Link to="/dashboard/stories" className={location.pathname.includes('/dashboard/stories') ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faClipboardList} />
-                                <span className="menu-text">Stories</span>
-                            </Link>
-                        </li> */}
-                    </ul>
-                </div>
+                        </div>
+                    </div>
 
-                <div className="menu-section">
-                    <div className="menu-header">Team</div>
-                    <ul>
-                        <li>
-                            <Link to="/dashboard/users" className={location.pathname === '/dashboard/users' ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faUsers} />
-                                <span className="menu-text">Team Members</span>
+                    {/* Projects Section */}
+                    <div>
+                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Projects
+                        </h3>
+                        <div className="mt-3 space-y-1">
+                            <Link 
+                                to="/dashboard/projects" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/projects'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faFolderOpen} className="mr-3 flex-shrink-0" />
+                                <span>All Projects</span>
                             </Link>
-                        </li>
-                        <li>
-                            <Link to="/dashboard/chat" className={location.pathname === '/dashboard/chat' ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faComments} />
-                                <span className="menu-text">Team Chat</span>
-                            </Link>
-                        </li>
-                    </ul>
-                </div>
+                        </div>
+                    </div>
 
-                <div className="menu-section">
-                    <div className="menu-header">Reports</div>
-                    <ul>
-                        <li>
-                            <Link to="/dashboard/analytics" className={location.pathname === '/dashboard/analytics' ? 'active' : ''}>
-                                <FontAwesomeIcon icon={faChartLine} />
-                                <span className="menu-text">Analytics</span>
+                    {/* Team Section */}
+                    <div>
+                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Team
+                        </h3>
+                        <div className="mt-3 space-y-1">
+                            <Link 
+                                to="/dashboard/users" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/users'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faUsers} className="mr-3 flex-shrink-0" />
+                                <span>Team Members</span>
                             </Link>
-                        </li>
-                    </ul>
+                            <Link 
+                                to="/dashboard/chat" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/chat'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faComments} className="mr-3 flex-shrink-0" />
+                                <span>Team Chat</span>
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Reports Section */}
+                    <div>
+                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Reports
+                        </h3>
+                        <div className="mt-3 space-y-1">
+                            <Link 
+                                to="/dashboard/analytics" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/analytics'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faChartLine} className="mr-3 flex-shrink-0" />
+                                <span>Analytics</span>
+                            </Link>
+                        </div>
+                    </div>
                 </div>
             </nav>
 
-            <div className="otherMenu">
-                <Link to="/dashboard/settings" className={`settings-link ${location.pathname === '/dashboard/settings' ? 'active' : ''}`}>
-                    <FontAwesomeIcon icon={faCog} />
-                    <span className="menu-text">Settings</span>
+            {/* Bottom Section */}
+            <div className="border-t border-gray-200 p-4 space-y-2">
+                <Link 
+                    to="/dashboard/settings" 
+                    className={`flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                        location.pathname === '/dashboard/settings'
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                >
+                    <FontAwesomeIcon icon={faCog} className="mr-3 flex-shrink-0" />
+                    <span>Settings</span>
                 </Link>
-                <button className="logout-button">
-                    <FontAwesomeIcon icon={faSignOutAlt} />
+                <button 
+                    className="w-full flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg"
+                    onClick={handleLogout}
+                >
+                    <FontAwesomeIcon icon={faSignOutAlt} className="mr-3 flex-shrink-0" />
                     <span>Logout</span>
                 </button>
             </div>
@@ -155,12 +227,14 @@ const DashboardLayout = () => {
     );
 
     return (
-        <div className="dashboard-container">
+        <div className="min-h-screen bg-gray-50">
             {renderSidebar()}
-            <main className="con">
+            <div className="pl-64">
                 <Header />
-                <Outlet />
-            </main>
+                <main className="p-6">
+                    <Outlet />
+                </main>
+            </div>
         </div>
     );
 };

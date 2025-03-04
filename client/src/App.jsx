@@ -19,7 +19,6 @@ import Settings from './pages/dashboard/settings';
 import Users from './pages/dashboard/Users';
 import MyTasks from './pages/dashboard/tasks/MyTasks';
 import AllTasks from './pages/dashboard/tasks/AllTasks';
-import dotenv from 'dotenv';
 import userService from '../src/services/userService';
 
 const PrivateRoute = ({ children, requiredRoles = [] }) => {

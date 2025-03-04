@@ -28,6 +28,12 @@ const Chat = () => {
     const messagesEndRef = useRef(null);
     const [showTeamInfo, setShowTeamInfo] = useState(false);
     const [pollingInterval, setPollingInterval] = useState(null);
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+    const messagesContainerRef = useRef(null);
+    const previousMessagesLength = useRef(0);
+    const [hasNewMessages, setHasNewMessages] = useState(false);
+    const lastMessageRef = useRef(null);
+    const lastPolledMessagesCount = useRef(0);
 
     const fetchUnreadCount = async () => {
         try {
@@ -75,8 +81,7 @@ const Chat = () => {
             markMessagesAsRead();
 
             const interval = setInterval(() => {
-                fetchMessages();
-                fetchUnreadCount();
+                checkNewMessages();
             }, 3000);
 
             setPollingInterval(interval);
@@ -142,7 +147,7 @@ const Chat = () => {
         }
     };
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (isPolling = false) => {
         try {
             setLoading(true);
             const response = await messageService.getChatMessages(
@@ -150,7 +155,22 @@ const Chat = () => {
                 selectedChat.isProjectChat ? selectedChat.user._id : null,
                 page
             );
-            setMessages(prev => page === 1 ? response.messages : [...prev, ...response.messages]);
+
+            setMessages(prev => {
+                const newMessages = page === 1 ? response.messages : [...prev, ...response.messages];
+                
+                if (isPolling && newMessages.length > previousMessagesLength.current) {
+                    setTimeout(scrollToBottom, 100);
+                }
+                
+                previousMessagesLength.current = newMessages.length;
+                return newMessages;
+            });
+
+            if (isInitialLoad) {
+                setTimeout(scrollToBottom, 100);
+                setIsInitialLoad(false);
+            }
         } catch (err) {
             setError(err.message);
         } finally {
@@ -217,30 +237,84 @@ const Chat = () => {
     };
 
     const updateRecentChats = (newMessage) => {
+        if (!selectedChat?.user?._id || !newMessage) return;
+
         setRecentChats(prev => {
             const updated = [...prev];
-            const chatIndex = updated.findIndex(chat => 
-                (chat.isProjectChat ? chat.user._id === selectedChat.user._id : chat.user._id === selectedChat.user._id)
-            );
+            const chatIndex = updated.findIndex(chat => {
+                if (!chat?.user?._id) return false;
+                return chat.isProjectChat 
+                    ? chat.user._id === selectedChat.user._id 
+                    : chat.user._id === selectedChat.user._id;
+            });
+
             if (chatIndex !== -1) {
                 updated[chatIndex] = {
                     ...updated[chatIndex],
                     lastMessage: {
-                        content: newMessage.content,
-                        createdAt: newMessage.createdAt
+                        content: newMessage.content || '',
+                        createdAt: newMessage.createdAt || new Date()
                     }
                 };
+                return updated;
             }
-            return updated;
+
+            // If chat not found, add it to the beginning of the list
+            const newChat = {
+                user: selectedChat.user,
+                isProjectChat: selectedChat.isProjectChat,
+                lastMessage: {
+                    content: newMessage.content || '',
+                    createdAt: newMessage.createdAt || new Date()
+                }
+            };
+            return [newChat, ...prev];
         });
     };
 
     const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+            setHasNewMessages(false);
+        }
     };
 
     const formatDate = (date) => {
         return new Date(date).toLocaleString();
+    };
+
+    const checkNewMessages = async () => {
+        try {
+            const response = await messageService.getChatMessages(
+                selectedChat.isProjectChat ? null : selectedChat.user._id,
+                selectedChat.isProjectChat ? selectedChat.user._id : null,
+                1
+            );
+
+            const newMessages = response.messages;
+            if (newMessages.length > lastPolledMessagesCount.current) {
+                const diff = newMessages.length - lastPolledMessagesCount.current;
+                const actualNewMessages = newMessages.slice(-diff);
+                
+                setMessages(prev => [...prev, ...actualNewMessages]);
+                lastPolledMessagesCount.current = newMessages.length;
+                
+                // Only scroll if user is near bottom
+                const container = messagesContainerRef.current;
+                if (container) {
+                    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+                    if (isNearBottom) {
+                        setTimeout(scrollToBottom, 100);
+                    } else {
+                        setHasNewMessages(true);
+                    }
+                }
+            }
+            
+            fetchUnreadCount();
+        } catch (err) {
+            console.error('Error checking new messages:', err);
+        }
     };
 
     const TeamInfoModal = () => {
@@ -331,53 +405,89 @@ const Chat = () => {
         </div>
     );
 
-    const MessageList = () => (
-        <div className="h-[calc(100vh-350px)] overflow-y-auto mb-4">
-            {messages.map(message => (
-                <div
-                    key={message._id}
-                    className={`flex mb-4 ${
-                        message.sender._id === JSON.parse(localStorage.getItem('user')?._id || '{}')
-                            ? 'justify-end'
-                            : 'justify-start'
-                    }`}
+    const MessageList = () => {
+        const currentUserId = JSON.parse(localStorage.getItem('user') || '{}')._id;
+
+        const isCurrentUser = (senderId) => {
+            return senderId === currentUserId;
+        };
+
+        return (
+            <div className="relative h-[calc(100vh-350px)]">
+                <div 
+                    ref={messagesContainerRef}
+                    className="h-full overflow-y-auto mb-4 scroll-smooth"
                 >
-                    <div
-                        className={`max-w-[70%] p-3 rounded-lg ${
-                            message.sender._id === JSON.parse(localStorage.getItem('user')?._id || '{}')
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-100'
-                        }`}
-                    >
-                        <div className="flex justify-between items-start gap-2">
-                            <div>
-                                {selectedChat?.isProjectChat && (
-                                    <div className="text-xs opacity-75 mb-1 font-medium">
-                                        {message.sender.name}
+                    {loading && isInitialLoad ? (
+                        <div className="flex justify-center items-center h-full">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4 px-2">
+                            {messages.map((message, index) => {
+                                if (!message || !message.sender) return null;
+
+                                const isLast = index === messages.length - 1;
+                                return (
+                                    <div
+                                        key={message._id}
+                                        ref={isLast ? lastMessageRef : null}
+                                        className={`flex mb-4 ${
+                                            isCurrentUser(message.sender._id)
+                                                ? 'justify-end'
+                                                : 'justify-start'
+                                        }`}
+                                    >
+                                        <div
+                                            className={`max-w-[70%] p-3 rounded-lg ${
+                                                isCurrentUser(message.sender._id)
+                                                    ? 'bg-blue-500 text-white'
+                                                    : 'bg-gray-100'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start gap-2">
+                                                <div>
+                                                    {selectedChat?.isProjectChat && message.sender.name && (
+                                                        <div className="text-xs opacity-75 mb-1 font-medium">
+                                                            {message.sender.name}
+                                                        </div>
+                                                    )}
+                                                    <p>{message.content || 'No message content'}</p>
+                                                </div>
+                                                {isCurrentUser(message.sender._id) && (
+                                                    <button
+                                                        onClick={() => handleDeleteMessage(message._id)}
+                                                        className="text-xs opacity-50 hover:opacity-100"
+                                                    >
+                                                        <FontAwesomeIcon icon={faTrash} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className={`text-xs mt-1 ${
+                                                isCurrentUser(message.sender._id)
+                                                    ? 'text-blue-100'
+                                                    : 'text-gray-500'
+                                            }`}>
+                                                {formatDate(message.createdAt)}
+                                            </div>
+                                        </div>
                                     </div>
-                                )}
-                                <p>{message.content}</p>
-                            </div>
-                            <button
-                                onClick={() => handleDeleteMessage(message._id)}
-                                className="text-xs opacity-50 hover:opacity-100"
-                            >
-                                <FontAwesomeIcon icon={faTrash} />
-                            </button>
+                                );
+                            })}
                         </div>
-                        <div className={`text-xs mt-1 ${
-                            message.sender._id === JSON.parse(localStorage.getItem('user')?._id || '{}')
-                                ? 'text-blue-100'
-                                : 'text-gray-500'
-                        }`}>
-                            {formatDate(message.createdAt)}
-                        </div>
-                    </div>
+                    )}
                 </div>
-            ))}
-            <div ref={messagesEndRef} />
-        </div>
-    );
+                {hasNewMessages && (
+                    <button
+                        onClick={scrollToBottom}
+                        className="absolute bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-600 transition-colors"
+                    >
+                        New Messages ↓
+                    </button>
+                )}
+            </div>
+        );
+    };
 
     return (
         <div className="p-6">
@@ -409,12 +519,21 @@ const Chat = () => {
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {recentChats.map(chat => (
+                            {recentChats.filter(chat => chat?.user?._id).map(chat => (
                                 <div
                                     key={chat.user._id}
-                                    onClick={() => setSelectedChat(chat)}
+                                    onClick={() => setSelectedChat({
+                                        ...chat,
+                                        user: {
+                                            ...chat.user,
+                                            _id: chat.user._id,
+                                            title: chat.user.title || chat.user.name || 'Unnamed Chat',
+                                            members: chat.user.members || []
+                                        },
+                                        isProjectChat: !!chat.isProjectChat
+                                    })}
                                     className={`p-3 rounded-lg cursor-pointer hover:bg-gray-50 ${
-                                        selectedChat?.user._id === chat.user._id ? 'bg-blue-50' : ''
+                                        selectedChat?.user?._id === chat.user?._id ? 'bg-blue-50' : ''
                                     }`}
                                 >
                                     <div className="flex items-center">
@@ -422,20 +541,22 @@ const Chat = () => {
                                             icon={chat.isProjectChat ? faUsers : faUserGroup} 
                                             className="mr-2 text-gray-500"
                                         />
-                                        <div className="font-medium">
-                                            {chat.user.title || chat.user.name}
-                                            {chat.isProjectChat && (
-                                                <span className="text-xs text-gray-500 ml-2">
-                                                    (Team Chat)
-                                                </span>
-                                            )}
+                                        <div>
+                                            <div className="font-medium">
+                                                {chat.user.title || chat.user.name || 'Unnamed Chat'}
+                                                {chat.isProjectChat && (
+                                                    <span className="text-xs text-gray-500 ml-2">
+                                                        (Team Chat)
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-gray-500 truncate mt-1">
+                                                {chat.lastMessage?.content || 'No messages yet'}
+                                            </div>
+                                            <div className="text-xs text-gray-400">
+                                                {chat.lastMessage?.createdAt ? formatDate(chat.lastMessage.createdAt) : ''}
+                                            </div>
                                         </div>
-                                    </div>
-                                    <div className="text-sm text-gray-500 truncate mt-1">
-                                        {chat.lastMessage.content}
-                                    </div>
-                                    <div className="text-xs text-gray-400">
-                                        {formatDate(chat.lastMessage.createdAt)}
                                     </div>
                                 </div>
                             ))}

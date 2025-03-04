@@ -13,10 +13,12 @@ import {
     faTags,
     faList,
     faComments,
-    faUser
+    faUser,
+    faEye
 } from '@fortawesome/free-solid-svg-icons';
 import { projectService, userService, categoryService, taskService } from '../../components/api';
 import LabelManager from '../../components/LabelManager';
+import moment from 'moment';
 
 const Projects = () => {
     const { projectId } = useParams();
@@ -133,18 +135,24 @@ const Projects = () => {
 
     const fetchProjectDetails = async () => {
         try {
+            setLoading(true);
             const data = await projectService.getProjectById(projectId);
             setSelectedProject(data);
             setProjectForm({
                 title: data.title,
                 description: data.description,
-                startDate: data.startDate,
-                endDate: data.endDate,
+                startDate: data.startDate ? moment(data.startDate).format('YYYY-MM-DD') : '',
+                endDate: data.endDate ? moment(data.endDate).format('YYYY-MM-DD') : '',
                 priority: data.priority,
                 tags: data.tags || []
             });
+            await fetchProjectTasks(projectId);
+            setError('');
         } catch (err) {
+            console.error('Error fetching project details:', err);
             setError(err.message || 'Failed to fetch project details');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -702,88 +710,103 @@ const Projects = () => {
         )
     );
 
-    const projectCard = (project) => (
-        <div key={project._id} className="bg-white rounded-lg shadow-sm p-6 mb-4">
-            <div className="flex justify-between items-start">
-                <div>
-                    <h3 className="text-xl font-semibold text-gray-900">{project.title}</h3>
-                    <p className="text-gray-600 mt-1">{project.description}</p>
-                </div>
-                <div className="flex space-x-2">
-                    <button
-                        onClick={() => {
-                            navigate(`/dashboard/chat?projectId=${project._id}&projectTitle=${encodeURIComponent(project.title)}`);
-                        }}
-                        className="text-blue-600 hover:text-blue-800"
-                        title="Team Chat"
-                    >
-                        <FontAwesomeIcon icon={faComments} />
-                    </button>
-                    <button
-                        onClick={() => {
-                            setSelectedProject(project);
-                            setProjectForm({
-                                title: project.title,
-                                description: project.description,
-                                startDate: project.startDate,
-                                endDate: project.endDate,
-                                priority: project.priority,
-                                tags: project.tags || []
-                            });
-                            setShowModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-800"
-                    >
-                        <FontAwesomeIcon icon={faEdit} />
-                    </button>
-                    <button
-                        onClick={() => handleDelete(project._id)}
-                        className="text-red-600 hover:text-red-800"
-                    >
-                        <FontAwesomeIcon icon={faTrash} />
-                    </button>
-                </div>
-            </div>
-            
-            <div className="mt-4 flex flex-wrap gap-2">
-                {project.tags && project.tags.map((tag, index) => (
-                    <span
-                        key={index}
-                        className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                    >
-                        {tag}
-                    </span>
-                ))}
-            </div>
+    const projectCard = (project) => {
+        if (!project) return null;
 
-            <div className="mt-4">
-                <div className="flex items-center space-x-2 text-sm text-gray-500">
-                    <FontAwesomeIcon icon={faCalendarAlt} />
-                    <span>
-                        {new Date(project.startDate).toLocaleDateString()} - 
-                        {project.endDate ? new Date(project.endDate).toLocaleDateString() : 'Ongoing'}
-                    </span>
-                </div>
-            </div>
-
-            <div className="mt-4">
-                <h4 className="text-sm font-medium text-gray-700 mb-2">Team Members</h4>
-                <div className="flex flex-wrap gap-2">
-                    {project.members.map(member => (
-                        <span
-                            key={member.user._id}
-                            className="px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center"
+        return (
+            <div key={project._id} className="bg-white rounded-lg shadow-sm p-6 mb-4">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <h3 className="text-xl font-semibold text-gray-900">{project.title}</h3>
+                        <p className="text-gray-600 mt-1">{project.description}</p>
+                    </div>
+                    <div className="flex space-x-2">
+                        <button
+                            onClick={() => {
+                                navigate(`/dashboard/projects/${project._id}`);
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="View Details"
                         >
-                            <FontAwesomeIcon icon={faUser} className="mr-1" />
-                            {member.user.name}
+                            <FontAwesomeIcon icon={faEye} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                navigate(`/dashboard/chat?projectId=${project._id}&projectTitle=${encodeURIComponent(project.title)}`);
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="Team Chat"
+                        >
+                            <FontAwesomeIcon icon={faComments} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setSelectedProject(project);
+                                setProjectForm({
+                                    title: project.title,
+                                    description: project.description,
+                                    startDate: project.startDate ? moment(project.startDate).format('YYYY-MM-DD') : '',
+                                    endDate: project.endDate ? moment(project.endDate).format('YYYY-MM-DD') : '',
+                                    priority: project.priority,
+                                    tags: project.tags || []
+                                });
+                                setShowModal(true);
+                            }}
+                            className="text-blue-600 hover:text-blue-800"
+                            title="Edit Project"
+                        >
+                            <FontAwesomeIcon icon={faEdit} />
+                        </button>
+                        <button
+                            onClick={() => handleDelete(project._id)}
+                            className="text-red-600 hover:text-red-800"
+                            title="Delete Project"
+                        >
+                            <FontAwesomeIcon icon={faTrash} />
+                        </button>
+                    </div>
+                </div>
+                
+                <div className="mt-4 flex flex-wrap gap-2">
+                    {project.tags && project.tags.map((tag, index) => (
+                        <span
+                            key={index}
+                            className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
+                        >
+                            {tag}
                         </span>
                     ))}
                 </div>
-            </div>
 
-            <ProjectTaskList project={project} />
-        </div>
-    );
+                <div className="mt-4">
+                    <div className="flex items-center space-x-2 text-sm text-gray-500">
+                        <FontAwesomeIcon icon={faCalendarAlt} />
+                        <span>
+                            {project.startDate ? moment(project.startDate).format('MMM DD, YYYY') : 'No start date'} - 
+                            {project.endDate ? moment(project.endDate).format('MMM DD, YYYY') : 'Ongoing'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Team Members</h4>
+                    <div className="flex flex-wrap gap-2">
+                        {project.members && project.members.map(member => (
+                            <span
+                                key={member.user._id}
+                                className="px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center"
+                            >
+                                <FontAwesomeIcon icon={faUser} className="mr-1" />
+                                {member.user.name}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                <ProjectTaskList project={project} />
+            </div>
+        );
+    };
 
     return (
         <div className="p-6">
