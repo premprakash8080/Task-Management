@@ -8,6 +8,7 @@ import categoryRoutes from './categories.js';
 import labelRoutes from './labels.js';
 import calendarRoutes from './calendar.js';
 import analyticsRoutes from './analytics.js';
+import dashboardRoutes from './dashboard.js';
 
 const router = express.Router();
 
@@ -30,5 +31,6 @@ router.use('/categories', categoryRoutes);
 router.use('/labels', labelRoutes);
 router.use('/calendar', calendarRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 export default router;

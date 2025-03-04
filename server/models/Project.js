@@ -50,8 +50,8 @@ const projectSchema = new mongoose.Schema({
     endDate: Date,
     priority: {
         type: String,
-        enum: ["low", "medium", "high"],
-        default: "medium"
+        enum: ["LOW", "MEDIUM", "HIGH"],
+        default: "MEDIUM"
     },
     progress: {
         type: Number,
