@@ -87,6 +87,15 @@ const loginUser = asyncHandler(async (req, res) => {
     );
 });
 
+// User Logout
+const logoutUser = asyncHandler(async (req, res) => {
+    // Since we're using JWT, we don't need to do anything server-side
+    // The client will handle removing the token
+    res.status(200).json(
+        new ApiResponse(200, null, "Logged out successfully")
+    );
+});
+
 // Get Current User Profile
 const getCurrentUser = asyncHandler(async (req, res) => {
     const user = await User.findById(req.user._id);
@@ -161,5 +170,6 @@ export {
     updateProfile,
     changePassword,
     getAllUsers,
-    deleteUser
+    deleteUser,
+    logoutUser
 };

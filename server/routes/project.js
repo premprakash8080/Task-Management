@@ -7,7 +7,8 @@ import {
     deleteProject,
     addProjectMember,
     removeProjectMember,
-    getProjectStats
+    getProjectStats,
+    getAccessibleProjectNames
 } from "../controllers/ProjectController.js";
 import { auth, authorize } from "../middleware/auth.js";
 
@@ -15,6 +16,9 @@ const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(auth);
+
+// Get accessible project names
+router.get("/names", getAccessibleProjectNames);
 
 // Project CRUD routes
 router.route("/")

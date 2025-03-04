@@ -6,7 +6,8 @@ import {
     updateProfile,
     changePassword,
     getAllUsers,
-    deleteUser
+    deleteUser,
+    logoutUser
 } from '../controllers/userController.js';
 import { auth, authorize } from '../middleware/auth.js';
 
@@ -15,6 +16,7 @@ const router = express.Router();
 // Public routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/logout', auth, logoutUser);
 
 // Protected routes
 router.use(auth); // Apply authentication middleware to all routes below

@@ -10,7 +10,8 @@ import {
     getTaskStats,
     getTasksByProjectId,
     getMyTasks,
-    markTaskComplete
+    markTaskComplete,
+    getAccessibleProjectsWithTasks
 } from "../controllers/taskController.js";
 
 const router = express.Router();
@@ -24,6 +25,7 @@ router.get("/", getAllTasks);
 router.get("/stats", getTaskStats);
 router.get("/my-tasks", getMyTasks);
 router.get("/project/:projectId", getTasksByProjectId);
+router.get("/projects-with-tasks", getAccessibleProjectsWithTasks);
 router.get("/:id", getTaskById);
 router.put("/:id", updateTask);
 router.delete("/:id", deleteTask);

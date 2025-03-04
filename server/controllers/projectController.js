@@ -168,7 +168,10 @@ const getProjectById = asyncHandler(async (req, res) => {
         .populate('members.user', 'name email')
         .populate({
             path: 'tasks',
-            populate: { path: 'assignedTo', select: 'name email' }
+            populate: [
+                { path: 'assignees.user', select: 'name email' },
+                { path: 'completedBy', select: 'name email' }
+            ]
         });
 
     if (!project) {
@@ -382,6 +385,28 @@ const getProjectStats = asyncHandler(async (req, res) => {
     );
 });
 
+// Get Accessible Project Names
+const getAccessibleProjectNames = asyncHandler(async (req, res) => {
+    // Find projects where user is either a member or creator
+    const projects = await Project.find({
+        $or: [
+            { createdBy: req.user._id },
+            { 'members.user': req.user._id }
+        ]
+    })
+    .select('title _id') // Only select title and _id fields
+    .sort({ title: 1 }); // Sort alphabetically by title
+
+    const projectNames = projects.map(project => ({
+        _id: project._id,
+        title: project.title
+    }));
+
+    res.status(200).json(
+        new ApiResponse(200, projectNames, "Project names retrieved successfully")
+    );
+});
+
 export {
     createProject,
     getAllProjects,
@@ -390,5 +415,6 @@ export {
     deleteProject,
     addProjectMember,
     removeProjectMember,
-    getProjectStats
+    getProjectStats,
+    getAccessibleProjectNames
 };

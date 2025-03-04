@@ -614,6 +614,86 @@ const getMyTasks = asyncHandler(async (req, res) => {
     );
 });
 
+// Get All Accessible Projects with Tasks
+const getAccessibleProjectsWithTasks = asyncHandler(async (req, res) => {
+    const { status, priority, search, page = 1, limit = 10 } = req.query;
+
+    // Find all projects where user is either a member or creator
+    const accessibleProjects = await Project.find({
+        $or: [
+            { createdBy: req.user._id },
+            { 'members.user': req.user._id }
+        ]
+    }).select('_id title');
+
+    const projectIds = accessibleProjects.map(project => project._id);
+
+    // Build task query
+    const taskQuery = {
+        project: { $in: projectIds }
+    };
+
+    // Add filters if provided
+    if (status) taskQuery.status = status;
+    if (priority) taskQuery.priority = priority;
+    if (search) {
+        taskQuery.$or = [
+            { title: { $regex: search, $options: 'i' } },
+            { description: { $regex: search, $options: 'i' } }
+        ];
+    }
+
+    // Get tasks for all accessible projects
+    const tasks = await Task.find(taskQuery)
+        .populate('assignees.user', 'name email')
+        .populate('createdBy', 'name email')
+        .populate('project', 'title')
+        .populate('category', 'name color')
+        .populate('labels', 'name color')
+        .populate('completedBy', 'name email')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit);
+
+    // Format tasks and group by project
+    const projectsWithTasks = accessibleProjects.map(project => {
+        const projectTasks = tasks.filter(task => 
+            task.project && task.project._id.toString() === project._id.toString()
+        );
+
+        return {
+            _id: project._id,
+            title: project.title,
+            tasks: projectTasks.map(task => ({
+                ...task._doc,
+                createdAt: moment(task.createdAt).format('YYYY-MM-DD HH:mm:ss'),
+                updatedAt: moment(task.updatedAt).format('YYYY-MM-DD HH:mm:ss'),
+                dueDate: task.dueDate ? moment(task.dueDate).format('YYYY-MM-DD') : null,
+                completedAt: task.completedAt ? moment(task.completedAt).format('YYYY-MM-DD HH:mm:ss') : null,
+                assignees: task.assignees.map(assignee => ({
+                    ...assignee._doc,
+                    assignedAt: moment(assignee.assignedAt).format('YYYY-MM-DD HH:mm:ss')
+                }))
+            })),
+            taskCount: projectTasks.length,
+            completedTasks: projectTasks.filter(task => task.status === 'done').length
+        };
+    });
+
+    const total = await Task.countDocuments(taskQuery);
+
+    res.status(200).json(
+        new ApiResponse(200, {
+            projects: projectsWithTasks,
+            pagination: {
+                total,
+                page: parseInt(page),
+                pages: Math.ceil(total / limit)
+            }
+        }, "Accessible projects with tasks retrieved successfully")
+    );
+});
+
 export {
     createTask,
     getAllTasks,
@@ -624,5 +704,6 @@ export {
     getTaskStats,
     getTasksByProjectId,
     getMyTasks,
-    markTaskComplete
+    markTaskComplete,
+    getAccessibleProjectsWithTasks
 };
