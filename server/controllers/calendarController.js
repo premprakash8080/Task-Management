@@ -107,22 +107,48 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
 
 // Create a new calendar event (task)
 const createCalendarEvent = asyncHandler(async (req, res) => {
-    const { title, description, dueDate, projectId, priority } = req.body;
+    const { title, description, dueDate, projectId, priority = 'MEDIUM' } = req.body;
     const userId = req.user._id;
 
     if (!title || !dueDate) {
         throw new ApiError(400, "Title and due date are required");
     }
 
-    const task = await Task.create({
+    // Validate priority
+    const validPriorities = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+    if (!validPriorities.includes(priority)) {
+        throw new ApiError(400, "Invalid priority value. Must be LOW, MEDIUM, HIGH, or URGENT");
+    }
+
+    // Create task data
+    const taskData = {
         title,
         description,
         dueDate,
-        project: projectId,
         priority,
         createdBy: userId,
         assignees: [{ user: userId }]
-    });
+    };
+
+    // Only add project if projectId is provided and valid
+    if (projectId) {
+        // Validate if project exists and user has access
+        const project = await Project.findOne({
+            _id: projectId,
+            $or: [
+                { members: userId },
+                { createdBy: userId }
+            ]
+        });
+
+        if (!project) {
+            throw new ApiError(404, "Project not found or access denied");
+        }
+
+        taskData.project = projectId;
+    }
+
+    const task = await Task.create(taskData);
 
     res.status(201).json(
         new ApiResponse(201, task, "Calendar event created successfully")
