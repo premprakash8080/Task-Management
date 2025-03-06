@@ -301,8 +301,7 @@ const Projects = () => {
     };
 
     const handleTaskClick = (task) => {
-        setSelectedTask(task);
-        setShowTaskDetail(true);
+        navigate(`/dashboard/tasks/detail/${task._id}`);
     };
 
     const ProjectTaskList = ({ project }) => {
@@ -324,7 +323,7 @@ const Projects = () => {
                         <div
                             key={task._id}
                             onClick={() => handleTaskClick(task)}
-                            className="bg-white p-3 rounded-lg shadow-sm hover:shadow cursor-pointer"
+                            className="bg-white p-3 rounded-lg shadow-sm hover:shadow cursor-pointer transition-all duration-200"
                         >
                             <div className="flex justify-between items-start">
                                 <div>
@@ -355,7 +354,7 @@ const Projects = () => {
                                 <div className="flex -space-x-2">
                                     {task.assignees.map(assignee => (
                                         <img
-                                            key={assignee.user._id}
+                                            key={`${task._id}-assignee-${assignee.user._id}`}
                                             src={assignee.user.profilePhoto || '/default-avatar.png'}
                                             alt={assignee.user.name}
                                             className="w-6 h-6 rounded-full border-2 border-white"
@@ -554,7 +553,7 @@ const Projects = () => {
                     .filter(cat => cat.isGlobal || cat.projectId === project._id)
                     .map(category => (
                         <span
-                            key={category._id}
+                            key={`${project._id}-category-${category._id}`}
                             className="px-2 py-1 rounded-full text-xs font-medium"
                             style={{ backgroundColor: category.color + '20', color: category.color }}
                         >
@@ -663,7 +662,7 @@ const Projects = () => {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Team Members</label>
                                 <div className="space-y-2">
                                     {selectedProject.members.map(member => (
-                                        <div key={member.user._id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                        <div key={`${selectedProject._id}-member-${member.user._id}`} className="flex items-center justify-between bg-gray-50 p-2 rounded">
                                             <div className="flex items-center">
                                                 <span className="font-medium">{member.user.name}</span>
                                                 <span className="text-sm text-gray-500 ml-2">({member.role})</span>
@@ -770,7 +769,7 @@ const Projects = () => {
                 <div className="mt-4 flex flex-wrap gap-2">
                     {project.tags && project.tags.map((tag, index) => (
                         <span
-                            key={index}
+                            key={`${project._id}-tag-${index}-${tag}`}
                             className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
                         >
                             {tag}
@@ -793,7 +792,7 @@ const Projects = () => {
                     <div className="flex flex-wrap gap-2">
                         {project.members && project.members.map(member => (
                             <span
-                                key={member.user._id}
+                                key={`${project._id}-member-${member.user._id}`}
                                 className="px-2 py-1 bg-gray-100 rounded-full text-sm flex items-center"
                             >
                                 <FontAwesomeIcon icon={faUser} className="mr-1" />
@@ -890,7 +889,9 @@ const Projects = () => {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                 {projects.map((project) => (
-                    projectCard(project)
+                    <div key={project._id}>
+                        {projectCard(project)}
+                    </div>
                 ))}
             </div>
 

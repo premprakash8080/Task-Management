@@ -28,7 +28,7 @@ const TaskCard = ({ task, onComplete, onEdit, onDelete, onClick }) => (
                     {task.assignees.map(assignee => (
                         <img
                             key={assignee.user._id}
-                            src={assignee.user.profilePhoto || '/default-avatar.png'}
+                            src={assignee.user.profilePhoto || '/assets/img/default-avatar.png'}
                             alt={assignee.user.name}
                             className="w-6 h-6 rounded-full border-2 border-white"
                             title={assignee.user.name}

@@ -190,7 +190,7 @@ const TaskDetailView = ({ task, onClose, onUpdate }) => {
                                 {task.assignees.map((assignee, index) => (
                                     <div key={index} className="flex items-center">
                                         <img
-                                            src={assignee.user.profilePhoto || '/default-avatar.png'}
+                                            src={assignee.user.profilePhoto || '/assets/img/default-avatar.png'}
                                             alt={assignee.user.name}
                                             className="w-6 h-6 rounded-full mr-2"
                                         />

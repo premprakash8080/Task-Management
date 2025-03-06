@@ -20,6 +20,7 @@ import Users from './pages/dashboard/Users';
 import MyTasks from './pages/dashboard/tasks/MyTasks';
 import AllTasks from './pages/dashboard/tasks/AllTasks';
 import userService from '../src/services/userService';
+import TaskDetail from './pages/dashboard/tasks/TaskDetail';
 
 const PrivateRoute = ({ children, requiredRoles = [] }) => {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -104,6 +105,7 @@ function App() {
         <Route path="tasks/my-tasks" element={<MyTasks />} />
         <Route path="tasks/all-tasks" element={<AllTasks />} />
         <Route path="tasks/:projectId" element={<Tasks />} />
+        <Route path="tasks/detail/:taskId" element={<TaskDetail />} />
         <Route path="story/:id" element={<Story />} />
         <Route path="users" element={
           <PrivateRoute requiredRoles={['admin', 'manager']}>

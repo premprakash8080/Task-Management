@@ -192,10 +192,12 @@ const getTaskById = asyncHandler(async (req, res) => {
     }
 
     const task = await Task.findById(id)
-        .populate('assignedTo', 'name email')
+        .populate('assignees.user', 'name email')
         .populate('createdBy', 'name email')
         .populate('project', 'title')
         .populate('subtasks.assignedTo', 'name email')
+        .populate('category', 'name color')
+        .populate('labels', 'name color')
         .populate('comments.user', 'name email')
         .populate('attachments.uploadedBy', 'name email');
 

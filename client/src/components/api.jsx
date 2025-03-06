@@ -279,24 +279,19 @@ export const taskService = {
     // Update task
     updateTask: async (taskId, taskData) => {
         try {
-            // Validate and format subtasks
-            const formattedSubtasks = taskData.subtasks?.map(subtask => ({
-                title: subtask.title || '',  // Ensure title is never undefined
-                description: subtask.description || '',
-                status: subtask.status || 'TODO',
-                dueDate: subtask.dueDate ? moment(subtask.dueDate).format('YYYY-MM-DD') : null,
-                assignedTo: subtask.assignedTo || null,
-                estimatedTime: subtask.estimatedTime || 0
-            })).filter(subtask => subtask.title.trim() !== ''); // Remove subtasks with empty titles
-
             // Format dates and handle empty assignees before sending
             const formattedData = {
                 ...taskData,
                 dueDate: taskData.dueDate ? moment(taskData.dueDate).format('YYYY-MM-DD') : null,
-                subtasks: formattedSubtasks
+                assignees: taskData.assignees || [],
+                // Ensure priority is uppercase if it exists
+                priority: taskData.priority ? taskData.priority.toUpperCase() : undefined
             };
 
             const response = await api.put(`/tasks/${taskId}`, formattedData);
+            if (!response.data.success) {
+                throw new Error(response.data.message || 'Failed to update task');
+            }
             return response.data.data;
         } catch (error) {
             throw error.response?.data?.message || error.message;
@@ -367,8 +362,20 @@ export const taskService = {
     getTaskById: async (taskId) => {
         try {
             const response = await api.get(`/tasks/${taskId}`);
-            return response.data.data;
+            if (!response.data.success) {
+                throw new Error(response.data.message || 'Failed to fetch task');
+            }
+            // Transform assignees data if needed
+            const taskData = response.data.data;
+            if (taskData.assignees) {
+                taskData.assignees = taskData.assignees.map(assignee => ({
+                    user: assignee.user || assignee,
+                    role: assignee.role || 'member'
+                }));
+            }
+            return taskData;
         } catch (error) {
+            console.error('Error fetching task:', error);
             throw error.response?.data?.message || error.message;
         }
     },
@@ -468,6 +475,20 @@ export const taskService = {
             };
         } catch (error) {
             console.error('Error fetching accessible projects with tasks:', error);
+            throw error.response?.data?.message || error.message;
+        }
+    },
+
+    // Mark task as complete
+    markTaskComplete: async (taskId) => {
+        try {
+            const response = await api.put(`/tasks/${taskId}/complete`);
+            if (!response.data.success) {
+                throw new Error(response.data.message || 'Failed to mark task as complete');
+            }
+            return response.data.data;
+        } catch (error) {
+            console.error('Error marking task as complete:', error);
             throw error.response?.data?.message || error.message;
         }
     }
