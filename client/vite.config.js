@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
+import path from 'path'
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -23,14 +23,14 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html')
+        main: path.resolve(__dirname, 'index.html')
       }
     }
   },
   resolve: {
     extensions: ['.js', '.jsx', '.json'],
     alias: {
-      '@': resolve(__dirname, 'src')
+      '@': path.resolve(__dirname, './src'),
     }
   },
   publicDir: 'public',

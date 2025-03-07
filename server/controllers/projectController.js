@@ -19,7 +19,7 @@ const createProject = asyncHandler(async (req, res) => {
         description,
         startDate: moment(startDate).toDate(),
         endDate: endDate ? moment(endDate).toDate() : null,
-        priority,
+        priority: priority ? priority.toUpperCase() : "MEDIUM",
         tags,
         createdBy: req.user._id,
         members: [{ user: req.user._id, role: "leader" }]
@@ -229,6 +229,11 @@ const updateProject = asyncHandler(async (req, res) => {
 
     if (!isLeader && !isCreator) {
         throw new ApiError(403, "Not authorized to update this project");
+    }
+
+    // Convert priority to uppercase if it exists in updates
+    if (updates.priority) {
+        updates.priority = updates.priority.toUpperCase();
     }
 
     // Update project
