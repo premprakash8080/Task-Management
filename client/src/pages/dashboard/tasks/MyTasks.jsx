@@ -34,7 +34,7 @@ const MyTasks = () => {
         description: '',
         project: '',
         assignedTo: '',
-        priority: 'medium',
+        priority: 'MEDIUM',
         dueDate: '',
         estimatedTime: '',
         actualTime: 0,
@@ -214,7 +214,7 @@ const MyTasks = () => {
                 description: '',
                 project: '',
                 assignedTo: '',
-                priority: 'medium',
+                priority: 'MEDIUM',
                 dueDate: '',
                 estimatedTime: '',
                 actualTime: 0,
@@ -236,7 +236,7 @@ const MyTasks = () => {
             description: task.description,
             project: task.project?._id || '',
             assignedTo: task.assignedTo?._id || task.assignedTo || '',
-            priority: task.priority || 'medium',
+            priority: task.priority || 'MEDIUM',
             dueDate: task.dueDate ? moment(task.dueDate).format('YYYY-MM-DDTHH:mm') : '',
             estimatedTime: task.estimatedTime || '',
             actualTime: task.actualTime || 0,
@@ -457,9 +457,9 @@ const MyTasks = () => {
                                         onChange={handleInputChange}
                                         className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                     >
-                                        <option value="low">Low</option>
-                                        <option value="medium">Medium</option>
-                                        <option value="high">High</option>
+                                        <option value="LOW">Low</option>
+                                        <option value="MEDIUM">Medium</option>
+                                        <option value="HIGH">High</option>
                                         <option value="urgent">Urgent</option>
                                     </select>
                                 </div>

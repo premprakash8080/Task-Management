@@ -408,10 +408,24 @@ export const taskService = {
             const response = await api.get(`/tasks/my-tasks${queryParams ? `?${queryParams}` : ''}`);
             
             if (response.data && response.data.data) {
+                // Ensure tasks array exists and handle null projects
+                const tasks = (response.data.data.tasks || []).map(task => ({
+                    ...task,
+                    project: task.project || { _id: 'unassigned', title: 'Unassigned Tasks' },
+                    assignees: task.assignees?.map(assignee => ({
+                        user: assignee.user || assignee,
+                        role: assignee.role || 'member'
+                    })) || [],
+                    createdAt: task.createdAt ? moment(task.createdAt).format('YYYY-MM-DD HH:mm:ss') : null,
+                    updatedAt: task.updatedAt ? moment(task.updatedAt).format('YYYY-MM-DD HH:mm:ss') : null,
+                    dueDate: task.dueDate ? moment(task.dueDate).format('YYYY-MM-DD') : null,
+                    completedAt: task.completedAt ? moment(task.completedAt).format('YYYY-MM-DD HH:mm:ss') : null
+                }));
+
                 return {
-                    tasks: response.data.data.tasks || [],
+                    tasks,
                     pagination: response.data.data.pagination || {
-                        total: 0,
+                        total: tasks.length,
                         page: 1,
                         pages: 1
                     }
