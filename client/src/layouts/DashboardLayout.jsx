@@ -67,8 +67,42 @@ const DashboardLayout = () => {
                                 <span>Dashboard</span>
                             </Link>
 
-                            {/* Tasks Dropdown */}
-                            <div className="relative">
+                            
+
+                            <Link 
+                                to="/dashboard/calendar" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/calendar'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faCalendarAlt} className="mr-3 flex-shrink-0" />
+                                <span>Calendar</span>
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Projects Section */}
+                    <div>
+                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Projects
+                        </h3>
+                        <div className="mt-3 space-y-1">
+                            <Link 
+                                to="/dashboard/projects" 
+                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
+                                    location.pathname === '/dashboard/projects'
+                                    ? 'bg-blue-50 text-blue-600'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                            >
+                                <FontAwesomeIcon icon={faFolderOpen} className="mr-3 flex-shrink-0" />
+                                <span>All Projects</span>
+                            </Link>
+                        </div>
+                        {/* Tasks Dropdown */}
+                        <div className="relative">
                                 <button
                                     onClick={() => setTasksDropdownOpen(!tasksDropdownOpen)}
                                     className={`w-full group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg ${
@@ -114,39 +148,6 @@ const DashboardLayout = () => {
                                     </div>
                                 )}
                             </div>
-
-                            <Link 
-                                to="/dashboard/calendar" 
-                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
-                                    location.pathname === '/dashboard/calendar'
-                                    ? 'bg-blue-50 text-blue-600'
-                                    : 'text-gray-700 hover:bg-gray-50'
-                                }`}
-                            >
-                                <FontAwesomeIcon icon={faCalendarAlt} className="mr-3 flex-shrink-0" />
-                                <span>Calendar</span>
-                            </Link>
-                        </div>
-                    </div>
-
-                    {/* Projects Section */}
-                    <div>
-                        <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                            Projects
-                        </h3>
-                        <div className="mt-3 space-y-1">
-                            <Link 
-                                to="/dashboard/projects" 
-                                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg ${
-                                    location.pathname === '/dashboard/projects'
-                                    ? 'bg-blue-50 text-blue-600'
-                                    : 'text-gray-700 hover:bg-gray-50'
-                                }`}
-                            >
-                                <FontAwesomeIcon icon={faFolderOpen} className="mr-3 flex-shrink-0" />
-                                <span>All Projects</span>
-                            </Link>
-                        </div>
                     </div>
 
                     
