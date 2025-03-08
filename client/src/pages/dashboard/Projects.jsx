@@ -48,7 +48,7 @@ const Projects = () => {
         description: '',
         startDate: '',
         endDate: '',
-        priority: 'medium',
+        priority: 'MEDIUM',
         tags: []
     });
 
@@ -216,7 +216,7 @@ const Projects = () => {
                 description: '',
                 startDate: '',
                 endDate: '',
-                priority: 'medium',
+                priority: 'MEDIUM',
                 tags: []
             });
             fetchProjects();
@@ -335,8 +335,8 @@ const Projects = () => {
                                 </div>
                                 <div className="flex items-center space-x-2">
                                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                        task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                        task.priority === 'medium' ? 'bg-orange-100 text-orange-800' :
+                                        task.priority === 'HIGH' ? 'bg-red-100 text-red-800' :
+                                        task.priority === 'MEDIUM' ? 'bg-orange-100 text-orange-800' :
                                         'bg-green-100 text-green-800'
                                     }`}>
                                         {task.priority}
@@ -602,9 +602,9 @@ const Projects = () => {
                                     onChange={handleInputChange}
                                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                                 >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="HIGH">High</option>
                                 </select>
                             </div>
                         </div>
@@ -834,7 +834,7 @@ const Projects = () => {
                                 description: '',
                                 startDate: '',
                                 endDate: '',
-                                priority: 'medium',
+                                priority: 'MEDIUM',
                                 tags: []
                             });
                             setShowModal(true);
@@ -867,9 +867,9 @@ const Projects = () => {
                     className="rounded-md border-gray-300"
                 >
                     <option value="">All Priority</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
                 </select>
                 <input
                     type="text"
