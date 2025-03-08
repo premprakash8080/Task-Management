@@ -6,7 +6,7 @@ const connectDB = async () => {
   try {
     mongoose.set("strictQuery", false); // Recommended for Mongoose 7+
 
-    await mongoose.connect("mongodb://127.0.0.1:27017/test", {
+    await mongoose.connect("mongodb+srv://bytebreak8080:zruNNhSF7KXIlAqD@cluster0.cmcjb.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0", {
       useNewUrlParser: true,
       useUnifiedTopology: true,
     });

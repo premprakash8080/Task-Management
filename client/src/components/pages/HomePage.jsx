@@ -153,10 +153,10 @@ const HomePage = () => {
                         <span className="text-white font-semibold text-xl">TaskMaster</span>
                     </div>
                     <div className="flex items-center space-x-4">
-                        <Link to="/signin" className="text-white/80 hover:text-white transition-colors">
+                        <Link to="/login" className="text-white/80 hover:text-white transition-colors">
                             Sign in
                         </Link>
-                        <Link to="/signup" className="button-primary">
+                        <Link to="/register" className="button-primary">
                             Get Started
                         </Link>
                     </div>
