@@ -230,7 +230,7 @@ const DashboardLayout = () => {
         <div className="min-h-screen bg-gray-50">
             {renderSidebar()}
             <div className="pl-64">
-                <Header />
+                {/* <Header /> */}
                 <main className="p-6">
                     <Outlet />
                 </main>
