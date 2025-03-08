@@ -5,6 +5,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import moment from 'moment';
+import User from "../models/User.js";
 
 // Create Task
 const createTask = asyncHandler(async (req, res) => {
@@ -287,13 +288,30 @@ const deleteTask = asyncHandler(async (req, res) => {
 
     // Check project access
     const project = await Project.findById(task.project);
-    const isLeader = project.members.some(member => 
-        member.user.toString() === req.user._id.toString() && member.role === "leader"
-    );
-    const isCreator = project.createdBy.toString() === req.user._id.toString();
+    if (!project) {
+        // If project doesn't exist, check if user is task creator or assignee
+        const isCreator = task.createdBy.toString() === req.user._id.toString();
+        const isAssignee = task.assignees.some(assignee => 
+            assignee.user.toString() === req.user._id.toString()
+        );
 
-    if (!isLeader && !isCreator) {
-        throw new ApiError(403, "Not authorized to delete this task");
+        if (!isCreator && !isAssignee) {
+            throw new ApiError(403, "Not authorized to delete this task");
+        }
+    } else {
+        // If project exists, check project-level permissions
+        const isLeader = project.members.some(member => 
+            member.user.toString() === req.user._id.toString() && member.role === "leader"
+        );
+        const isProjectCreator = project.createdBy.toString() === req.user._id.toString();
+        const isTaskCreator = task.createdBy.toString() === req.user._id.toString();
+        const isAssignee = task.assignees.some(assignee => 
+            assignee.user.toString() === req.user._id.toString()
+        );
+
+        if (!isLeader && !isProjectCreator && !isTaskCreator && !isAssignee) {
+            throw new ApiError(403, "Not authorized to delete this task");
+        }
     }
 
     await Task.findByIdAndDelete(id);
@@ -696,6 +714,247 @@ const getAccessibleProjectsWithTasks = asyncHandler(async (req, res) => {
     );
 });
 
+// Task Dependencies
+const addTaskDependency = asyncHandler(async (req, res) => {
+    const { taskId } = req.params;
+    const { dependencyId, type } = req.body;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
+    }
+
+    const dependencyTask = await Task.findById(dependencyId);
+    if (!dependencyTask) {
+        res.status(404);
+        throw new Error('Dependency task not found');
+    }
+
+    // Check for circular dependencies
+    if (await hasCircularDependency(taskId, dependencyId)) {
+        res.status(400);
+        throw new Error('Adding this dependency would create a circular dependency');
+    }
+
+    task.dependencies.push({
+        task: dependencyId,
+        type
+    });
+
+    await task.save();
+
+    res.status(200).json({
+        success: true,
+        data: task
+    });
+});
+
+const removeTaskDependency = asyncHandler(async (req, res) => {
+    const { taskId, dependencyId } = req.params;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
+    }
+
+    task.dependencies = task.dependencies.filter(
+        dep => dep.task.toString() !== dependencyId
+    );
+
+    await task.save();
+
+    res.status(200).json({
+        success: true,
+        data: task
+    });
+});
+
+// Time Tracking
+const addTimeLog = asyncHandler(async (req, res) => {
+    const { taskId } = req.params;
+    const { duration, description, startTime, endTime } = req.body;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
+    }
+
+    if (!task.timeTracking) {
+        task.timeTracking = {
+            estimated: task.estimatedTime || 0,
+            spent: 0,
+            remaining: task.estimatedTime || 0,
+            logs: []
+        };
+    }
+
+    const timeLog = {
+        duration,
+        description,
+        startTime,
+        endTime,
+        loggedBy: req.user._id
+    };
+
+    task.timeTracking.logs.push(timeLog);
+    task.timeTracking.spent += duration;
+    task.timeTracking.remaining = Math.max(0, task.timeTracking.estimated - task.timeTracking.spent);
+
+    await task.save();
+
+    res.status(200).json({
+        success: true,
+        data: task
+    });
+});
+
+// Recurring Tasks
+const createRecurringTask = asyncHandler(async (req, res) => {
+    const { taskId } = req.params;
+    const { frequency, customPattern, startDate, endDate } = req.body;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
+    }
+
+    task.recurring = {
+        isRecurring: true,
+        frequency,
+        customPattern,
+        startDate,
+        endDate,
+        lastGenerated: new Date()
+    };
+
+    await task.save();
+
+    // Schedule the next occurrence
+    await scheduleNextRecurrence(task);
+
+    res.status(200).json({
+        success: true,
+        data: task
+    });
+});
+
+// Task History
+const getTaskHistory = asyncHandler(async (req, res) => {
+    const { taskId } = req.params;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
+    }
+
+    res.status(200).json({
+        success: true,
+        data: task.history
+    });
+});
+
+// Batch Operations
+const batchUpdateTasks = asyncHandler(async (req, res) => {
+    const { taskIds, updates } = req.body;
+
+    const tasks = await Task.find({ _id: { $in: taskIds } });
+    if (tasks.length !== taskIds.length) {
+        res.status(404);
+        throw new Error('One or more tasks not found');
+    }
+
+    const updatedTasks = await Task.updateMany(
+        { _id: { $in: taskIds } },
+        { $set: updates },
+        { new: true }
+    );
+
+    res.status(200).json({
+        success: true,
+        data: updatedTasks
+    });
+});
+
+// Custom Fields
+const updateCustomFields = asyncHandler(async (req, res) => {
+    const { taskId } = req.params;
+    const { customFields } = req.body;
+
+    const task = await Task.findById(taskId);
+    if (!task) {
+        res.status(404);
+        throw new Error('Task not found');
+    }
+
+    task.customFields = customFields;
+    await task.save();
+
+    res.status(200).json({
+        success: true,
+        data: task
+    });
+});
+
+// Helper Functions
+const hasCircularDependency = async (taskId, dependencyId, visited = new Set()) => {
+    if (visited.has(taskId)) return false;
+    if (taskId === dependencyId) return true;
+
+    visited.add(taskId);
+    const task = await Task.findById(dependencyId);
+    
+    if (!task || !task.dependencies.length) return false;
+
+    for (const dep of task.dependencies) {
+        if (await hasCircularDependency(taskId, dep.task.toString(), visited)) {
+            return true;
+        }
+    }
+
+    return false;
+};
+
+const scheduleNextRecurrence = async (task) => {
+    if (!task.recurring.isRecurring) return;
+
+    let nextDate;
+    switch (task.recurring.frequency) {
+        case 'daily':
+            nextDate = moment(task.recurring.lastGenerated).add(1, 'day');
+            break;
+        case 'weekly':
+            nextDate = moment(task.recurring.lastGenerated).add(1, 'week');
+            break;
+        case 'monthly':
+            nextDate = moment(task.recurring.lastGenerated).add(1, 'month');
+            break;
+        case 'custom':
+            // Handle custom pattern
+            break;
+    }
+
+    if (nextDate && (!task.recurring.endDate || nextDate.isBefore(task.recurring.endDate))) {
+        const newTask = new Task({
+            ...task.toObject(),
+            _id: mongoose.Types.ObjectId(),
+            dueDate: nextDate.toDate(),
+            status: 'todo',
+            completedAt: null,
+            recurring: {
+                ...task.recurring,
+                lastGenerated: nextDate.toDate()
+            }
+        });
+
+        await newTask.save();
+    }
+};
+
 export {
     createTask,
     getAllTasks,
@@ -707,5 +966,12 @@ export {
     getTasksByProjectId,
     getMyTasks,
     markTaskComplete,
-    getAccessibleProjectsWithTasks
+    getAccessibleProjectsWithTasks,
+    addTaskDependency,
+    removeTaskDependency,
+    addTimeLog,
+    createRecurringTask,
+    getTaskHistory,
+    batchUpdateTasks,
+    updateCustomFields
 };

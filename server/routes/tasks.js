@@ -11,7 +11,14 @@ import {
     getTasksByProjectId,
     getMyTasks,
     markTaskComplete,
-    getAccessibleProjectsWithTasks
+    getAccessibleProjectsWithTasks,
+    addTaskDependency,
+    removeTaskDependency,
+    addTimeLog,
+    createRecurringTask,
+    getTaskHistory,
+    batchUpdateTasks,
+    updateCustomFields
 } from "../controllers/taskController.js";
 
 const router = express.Router();
@@ -36,5 +43,24 @@ router.put("/:id/complete", markTaskComplete);
 
 // Task comments
 router.post("/:id/comments", addTaskComment);
+
+// New routes for enhanced features
+router.put("/batch", batchUpdateTasks);
+
+// Dependencies
+router.post("/:id/dependencies", addTaskDependency);
+router.delete("/:id/dependencies/:dependencyId", removeTaskDependency);
+
+// Time Tracking
+router.post("/:id/time-logs", addTimeLog);
+
+// Recurring Tasks
+router.post("/:id/recurring", createRecurringTask);
+
+// Task History
+router.get("/:id/history", getTaskHistory);
+
+// Custom Fields
+router.put("/:id/custom-fields", updateCustomFields);
 
 export default router;

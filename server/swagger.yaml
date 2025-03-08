@@ -1,0 +1,848 @@
+openapi: 3.0.0
+info:
+  title: Task Management API
+  version: 1.0.0
+  description: API documentation for the Task Management System
+
+servers:
+  - url: http://localhost:9000/api
+    description: Development server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        lastName:
+          type: string
+        role:
+          type: string
+          enum: [user, team_lead, project_manager, admin]
+        teams:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMembership'
+        preferences:
+          type: object
+          properties:
+            theme:
+              type: string
+              enum: [light, dark, system]
+            notifications:
+              type: object
+            dashboard:
+              type: object
+        status:
+          type: string
+          enum: [active, inactive, suspended]
+
+    TeamMembership:
+      type: object
+      properties:
+        team:
+          type: string
+        role:
+          type: string
+          enum: [member, lead]
+        joinedAt:
+          type: string
+          format: date-time
+
+    Task:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        project:
+          type: string
+        assignees:
+          type: array
+          items:
+            type: object
+            properties:
+              user:
+                type: string
+              role:
+                type: string
+        priority:
+          type: string
+          enum: [low, medium, high, urgent]
+        status:
+          type: string
+          enum: [todo, in_progress, review, completed]
+        dueDate:
+          type: string
+          format: date-time
+        category:
+          type: string
+        labels:
+          type: array
+          items:
+            type: string
+
+    Project:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+        priority:
+          type: string
+        members:
+          type: array
+          items:
+            $ref: '#/components/schemas/TeamMembership'
+
+    Category:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        color:
+          type: string
+        icon:
+          type: string
+        projectId:
+          type: string
+        isGlobal:
+          type: boolean
+
+    Label:
+      type: object
+      properties:
+        name:
+          type: string
+        color:
+          type: string
+        description:
+          type: string
+        projectId:
+          type: string
+
+    Message:
+      type: object
+      properties:
+        sender:
+          type: string
+        recipient:
+          type: string
+        content:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+        isRead:
+          type: boolean
+
+    Notification:
+      type: object
+      properties:
+        user:
+          type: string
+        type:
+          type: string
+        content:
+          type: string
+        isRead:
+          type: boolean
+        isArchived:
+          type: boolean
+
+paths:
+  /users/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                name:
+                  type: string
+                lastName:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: User registered successfully
+
+  /users/login:
+    post:
+      tags: [Authentication]
+      summary: Login user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /tasks:
+    post:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+      responses:
+        '201':
+          description: Task created successfully
+
+    get:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Get all tasks
+      parameters:
+        - in: query
+          name: project
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: priority
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+
+  /projects:
+    post:
+      tags: [Projects]
+      security:
+        - BearerAuth: []
+      summary: Create a new project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+      responses:
+        '201':
+          description: Project created successfully
+
+    get:
+      tags: [Projects]
+      security:
+        - BearerAuth: []
+      summary: Get all projects
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Projects retrieved successfully
+
+  /categories:
+    post:
+      tags: [Categories]
+      security:
+        - BearerAuth: []
+      summary: Create a new category
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Category'
+      responses:
+        '201':
+          description: Category created successfully
+
+  /labels:
+    post:
+      tags: [Labels]
+      security:
+        - BearerAuth: []
+      summary: Create a new label
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Label'
+      responses:
+        '201':
+          description: Label created successfully
+
+  /messages:
+    post:
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      summary: Send a message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Message'
+      responses:
+        '201':
+          description: Message sent successfully
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      summary: Get user notifications
+      parameters:
+        - in: query
+          name: isRead
+          schema:
+            type: boolean
+        - in: query
+          name: isArchived
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Notifications retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+
+  /dashboard:
+    get:
+      tags: [Dashboard]
+      security:
+        - BearerAuth: []
+      summary: Get dashboard data
+      responses:
+        '200':
+          description: Dashboard data retrieved successfully
+
+  /analytics:
+    get:
+      tags: [Analytics]
+      security:
+        - BearerAuth: []
+      summary: Get analytics data
+      responses:
+        '200':
+          description: Analytics data retrieved successfully
+
+  /calendar:
+    get:
+      tags: [Calendar]
+      security:
+        - BearerAuth: []
+      summary: Get calendar events
+      responses:
+        '200':
+          description: Calendar events retrieved successfully
+
+  /teams:
+    post:
+      summary: Create a new team
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                department:
+                  type: string
+                maxMembers:
+                  type: number
+      responses:
+        '201':
+          description: Team created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+    get:
+      summary: Get all teams
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: department
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Teams retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  teams:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Team'
+                  pagination:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      pages:
+                        type: integer
+
+  /teams/{id}:
+    get:
+      tags: [Teams]
+      security:
+        - BearerAuth: []
+      summary: Get team by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Team retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Team'
+
+    put:
+      tags: [Teams]
+      security:
+        - BearerAuth: []
+      summary: Update team
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Team'
+      responses:
+        '200':
+          description: Team updated successfully
+
+  /teams/{id}/members:
+    post:
+      tags: [Teams]
+      security:
+        - BearerAuth: []
+      summary: Add team member
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+                  enum: [member, lead]
+      responses:
+        '200':
+          description: Member added successfully
+
+  /teams/{id}/members/{userId}:
+    delete:
+      tags: [Teams]
+      security:
+        - BearerAuth: []
+      summary: Remove team member
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Member removed successfully
+
+  /tasks/{id}:
+    get:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Get task by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+    put:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Update task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Task'
+      responses:
+        '200':
+          description: Task updated successfully
+
+    delete:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Delete task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task deleted successfully
+
+  /tasks/my-tasks:
+    get:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Get user's assigned tasks
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: priority
+          schema:
+            type: string
+        - in: query
+          name: project
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tasks retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+
+  /tasks/{id}/comments:
+    post:
+      tags: [Tasks]
+      security:
+        - BearerAuth: []
+      summary: Add comment to task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Comment added successfully
+
+  /projects/{id}:
+    get:
+      tags: [Projects]
+      security:
+        - BearerAuth: []
+      summary: Get project by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Project retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+
+    put:
+      tags: [Projects]
+      security:
+        - BearerAuth: []
+      summary: Update project
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+      responses:
+        '200':
+          description: Project updated successfully
+
+  /projects/{id}/members:
+    post:
+      tags: [Projects]
+      security:
+        - BearerAuth: []
+      summary: Add project member
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                role:
+                  type: string
+      responses:
+        '200':
+          description: Member added successfully
+
+  /messages/{userId}:
+    get:
+      tags: [Messages]
+      security:
+        - BearerAuth: []
+      summary: Get chat messages with user
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+
+  /notifications/mark-all-read:
+    put:
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      summary: Mark all notifications as read
+      responses:
+        '200':
+          description: All notifications marked as read
+
+  /notifications/{id}/read:
+    put:
+      tags: [Notifications]
+      security:
+        - BearerAuth: []
+      summary: Mark notification as read
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked as read
+
+tags:
+  - name: Authentication
+    description: User authentication endpoints
+  - name: Tasks
+    description: Task management endpoints
+  - name: Projects
+    description: Project management endpoints
+  - name: Teams
+    description: Team management endpoints
+  - name: Messages
+    description: Messaging system endpoints
+  - name: Notifications
+    description: Notification system endpoints
+  - name: Categories
+    description: Category management endpoints
+  - name: Labels
+    description: Label management endpoints
+  - name: Dashboard
+    description: Dashboard data endpoints
+  - name: Analytics
+    description: Analytics data endpoints
+  - name: Calendar
+    description: Calendar management endpoints 

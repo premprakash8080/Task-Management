@@ -18,7 +18,7 @@ router.get("/", (req, res) => {
     title: "Test MongoDB",
     details:
       "To test, send a POST request with Postman to http://localhost:3000/users.",
-    author: "@mreorhan",
+    author: "@Premprakash8080",
   });
 });
 

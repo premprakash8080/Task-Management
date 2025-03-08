@@ -6,6 +6,8 @@ import cors from "cors";
 import createError from "http-errors";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import swaggerUi from 'swagger-ui-express';
+import YAML from 'yamljs';
 
 import indexRouter from "./routes/index.js";
 import usersRouter from "./routes/users.js";
@@ -26,9 +28,13 @@ const app = express();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
+
 // Enable CORS for requests from http://localhost:3000
 app.use(cors({
-  origin: "http://localhost:3000"
+  origin: ["http://localhost:3000", "http://localhost:9000"],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // View engine setup
@@ -40,6 +46,15 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
+
+// Serve Swagger documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  explorer: true,
+  customCss: '.swagger-ui .topbar { display: none }',
+  swaggerOptions: {
+    persistAuthorization: true
+  }
+}));
 
 // API Routes
 app.use("/api", indexRouter);

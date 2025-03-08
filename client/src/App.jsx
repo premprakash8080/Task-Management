@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from './layouts/DashboardLayout';
-import Login from './pages/Login';
-import HomePage from './components/pages/HomePage';
+import Login from './pages/auth/Login';
+import HomePage from './pages/HomePage';
 import About from './components/pages/About';
 import Contact from './components/pages/Contact';
 import PrivacyPolicy from './components/pages/PrivacyPolicy';
@@ -12,15 +12,15 @@ import Dashboard from './pages/dashboard';
 import Projects from './pages/dashboard/Projects';
 import Tasks from './pages/dashboard/Tasks';
 import Story from './pages/dashboard/story';
-import Calendar from './pages/dashboard/calendar';
-import Chat from './pages/dashboard/chat';
-import Analytics from './pages/dashboard/analytics';
-import Settings from './pages/dashboard/settings';
+import Calendar from './pages/dashboard/Calendar';
+import Chat from './pages/dashboard/Chat';
+import Analytics from './pages/dashboard/Analytics';
+import Settings from './pages/dashboard/Settings';
 import Users from './pages/dashboard/Users';
 import MyTasks from './pages/dashboard/tasks/MyTasks';
 import AllTasks from './pages/dashboard/tasks/AllTasks';
-import userService from '../src/services/userService';
 import TaskDetail from './pages/dashboard/tasks/TaskDetail';
+import { userService } from './services/api';
 
 const PrivateRoute = ({ children, requiredRoles = [] }) => {
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -43,7 +43,7 @@ const PrivateRoute = ({ children, requiredRoles = [] }) => {
         }
 
         const response = await userService.getProfile();
-        const userRole = response.data.role;
+        const userRole = response.role;
         setIsAuthorized(requiredRoles.includes(userRole));
         setLoading(false);
       } catch (error) {
@@ -67,19 +67,17 @@ const PrivateRoute = ({ children, requiredRoles = [] }) => {
   return isAuthorized ? children : <Navigate to="/login" />;
 };
 
-const NotFoundPage = () => {
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">Page Not Found</h2>
-        <p className="text-gray-600 mb-4">The page you're looking for doesn't exist.</p>
-        <a href="/" className="text-blue-600 hover:text-blue-800">
-          Return to Homepage
-        </a>
-      </div>
+const NotFoundPage = () => (
+  <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+    <div className="text-center">
+      <h2 className="text-2xl font-bold text-gray-800 mb-4">Page Not Found</h2>
+      <p className="text-gray-600 mb-4">The page you're looking for doesn't exist.</p>
+      <a href="/" className="text-blue-600 hover:text-blue-800">
+        Return to Homepage
+      </a>
     </div>
-  );
-};
+  </div>
+);
 
 function App() {
   return (
